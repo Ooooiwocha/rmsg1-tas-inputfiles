@@ -4,6 +4,18 @@
 
 BizHawk用の入力ファイル（`.bk2`）と、その短縮履歴です。
 
+## TAS制作研究報告
+
+**[研究報告を読む（GitHubで表示できるMarkdown版）](docs/research/report.md)**
+
+7,325F入力の制作・検証、先行TASとの比較、レイディバグの機構研究と確認の限界を、実測画像・概念図・表・出典とともに掲載しています。
+
+- [HTML版](docs/research/report.html)：元のレイアウトを保つ版です。リポジトリをダウンロードし、`docs/research/report.html` をブラウザーで開いてください（同階層の `assets/` も必要です）。GitHubのファイル画面ではHTMLのソースが表示されます。
+- [原本MHTML（保存資料）](%E3%83%AD%E3%83%9E%E3%83%B3%E3%82%B7%E3%83%B3%E3%82%B0%20%E3%82%B5%E3%82%ACTAS%E5%88%B6%E4%BD%9C%E7%A0%94%E7%A9%B6%E5%A0%B1%E5%91%8A.mhtml)
+- [変換方法と確認内容](docs/research/README.md)
+
+共有用の版は原本の形式変換です。研究内容や検証結果の更新ではありません。
+
 ## まず再生するなら：7,325F版
 
 **[最新・最良の7,325F版をダウンロード](https://raw.githubusercontent.com/Ooooiwocha/rmsg1-tas-inputfiles/main/latest/RS1_BizHawk_reset49_connected_7325F_verified.bk2)**
@@ -82,4 +94,5 @@ F数は入力ログの長さ（操作終了の目安）で、エンディング�
 - SHA-256：`ef0203f331f005967c043d9c76e052fc094457869ca3b11be462d5681a8270fa`
 
 過去16件のBK2は内容を変更せずに保存しています。前の最新版7,337Fは `archive/` に移しました。以前のroot直下や旧最新版へのリンクをお使いの場合は、このページのリンクに更新してください。
+
 
