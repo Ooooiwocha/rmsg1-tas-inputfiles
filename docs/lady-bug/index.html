@@ -125,6 +125,10 @@ ul.plain{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px;
 .quiz details p{max-width:none}
 .why{font-size:13px;line-height:1.65;color:var(--count);border-left:3px solid var(--count);padding-left:8px;margin-bottom:6px}
 .why code{background:none;padding:0;color:inherit}
+details.aside{background:var(--surface);border:1px dashed var(--line);border-radius:6px;padding:12px 16px}
+details.aside summary{cursor:pointer;color:var(--accent);font-weight:700;font-size:15px}
+details.aside>div{margin-top:12px;display:flex;flex-direction:column;gap:10px;font-size:14px;line-height:1.8}
+details.aside p,details.aside ul{max-width:none}
 .score{font-family:var(--f-mono);font-size:14px;color:var(--muted)}
 footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
 </style>
@@ -308,6 +312,21 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     <p class="small">まぎらわしいのですが、ここには FF が2つ出てきます。アドレス $1A:<b>FF</b>7F の上位バイトの FF と、その場所に書かれている値の FF です。時計で変わるのは前者だけで、ROMに書かれた値は変わりません。FF が 8F に減るのではなく、読む場所がずれて、別の場所にあった 8F を読む、ということです。</p>
     <figcaption>条件判定 <code>28</code> は、判定の結果によって、次の2バイトを読み飛ばします。主人公が違うブロックでは <code>1E 0B</code> と <code>00 FF</code> が両方飛ばされ、次のブロックへ進みます。主人公が合うブロックでは、<code>1E 0B</code> を実行し、<code>00 FF</code> で終わります。ホークの場合、先頭から4番目のブロックの <code>00</code>（$1A:FF7E）まで、54バイトを同じフレームのうちに読み進みます。$1701 は音を鳴らす処理に渡す番号の置き場所です。条件が主人公の判定であることと、<code>1E 0B</code> が曲を切り替える処理であることは、並びからの推定です。</figcaption>
   </figure>
+  <details class="aside">
+    <summary>余談：台本0x194は、なぜこんな書き方なのか</summary>
+    <div>
+      <p>同じ条件判定を2回書き、同じ形のブロックを8回並べる。ふつうのプログラムなら「主人公の番号で表を引いて曲番号を取り出す」と1行で済む処理です。こうなっているのは、台本の命令の作りに理由があると考えられます。</p>
+      <ul class="plain">
+        <li><b>条件判定は「次の2バイトを飛ばす」しかできない</b>　飛ばす長さが2バイトに固定されていて、「ここからここまで」という範囲をまとめられません。条件つきで実行したい命令が2つ（<code>1E 0B</code> と <code>00 FF</code>）あるので、命令1つごとに同じ判定を付けています。</li>
+        <li><b>「違えば次へ」を書く方法がない</b>　そのため、先に曲番号を書いてしまい、主人公が違ったら次のブロックで上書きする、という順番になっています。</li>
+        <li><b>飛べるのは別の台本の先頭だけ</b>　台本の切り替えは、同じ台本の数バイト先へ飛ぶ使い方ができません。判定を繰り返すしかなくなります。</li>
+        <li><b>終了が2バイトの <code>00 FF</code> で書かれている</b>　終了だけなら1バイトの <code>1A</code> で足ります。飛ばす長さの2バイトに合わせるために、「終了しか書かれていない台本0xFFへ切り替える」という回り道を使ったのでしょう。</li>
+      </ul>
+      <p>「次の1命令だけを飛ばす」という条件判定は、1960〜70年代の小型コンピューターや一部のマイコンにも見られる、ごく単純な作りです。判定の仕組みを単純にすると、台本を解釈するプログラムは短く済みます。その代わりに、台本を書く側が同じ判定を何度も書くことになります。</p>
+      <p>そして、この書き方がレイディバグの入口になっています。<code>1A</code> は1バイトなので、時計でずれる余地がありません。<code>00 FF</code> は2バイトの間に2フレームかかるので、12枚目のメモの上では2バイト目が別の値に化けます。</p>
+      <p class="muted">この欄の内容は、命令の並びと働きからの推測です。副命令の大半は未解読で、計算や自由な分岐の命令が別にある可能性は残っています。</p>
+    </div>
+  </details>
   <p>ここから先は「台本の切り替え」という命令が何度も出てきます。バグの動きを左右する命令なので、先に説明します。</p>
   <figure class="fig">
     <h3>台本の切り替えとは</h3>
