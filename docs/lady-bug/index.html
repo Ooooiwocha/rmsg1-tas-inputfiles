@@ -295,6 +295,16 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <tbody><tr><td class="n">1</td><td class="mono">$1A:FF48〜</td><td class="mono">47 17 01 1F</td><td class="mono">28 40 0E</td><td></td></tr><tr><td class="n">2</td><td class="mono">$1A:FF56〜</td><td class="mono">47 17 01 17</td><td class="mono">28 41 0E</td><td></td></tr><tr><td class="n">3</td><td class="mono">$1A:FF64〜</td><td class="mono">47 17 01 10</td><td class="mono">28 42 0E</td><td></td></tr><tr style="background:var(--win)"><td class="n">4</td><td class="mono">$1A:FF72〜</td><td class="mono">47 17 01 09</td><td class="mono">28 43 0E</td><td><b>TASの主人公（ホーク）はここ</b></td></tr><tr><td class="n">5</td><td class="mono">$1A:FF80〜</td><td class="mono">47 17 01 01</td><td class="mono">28 44 0E</td><td></td></tr><tr><td class="n">6</td><td class="mono">$1A:FF8E〜</td><td class="mono">47 17 01 07</td><td class="mono">28 45 0E</td><td></td></tr><tr><td class="n">7</td><td class="mono">$1A:FF9C〜</td><td class="mono">47 17 01 0B</td><td class="mono">28 46 0E</td><td></td></tr><tr><td class="n">8</td><td class="mono">$1A:FFAA〜</td><td class="mono">47 17 01 14</td><td class="muted">なし</td><td>条件判定も <span class="mono">00 FF</span> もなく、<span class="mono">1E 0B</span> で台本の終わりに達する</td></tr>
       </tbody>
     </table></div>
+    <h3>4番目のブロックのアドレス</h3>
+    <div class="bytes">
+      <span class="by cmd"><i>47 17 01 09</i><small>$1A:FF72〜FF75</small></span>
+      <span class="by cmd"><i>28 43 0E</i><small>FF76〜FF78</small></span>
+      <span class="by cmd"><i>1E 0B</i><small>FF79〜FF7A</small></span>
+      <span class="by cmd"><i>28 43 0E</i><small>FF7B〜FF7D</small></span>
+      <span class="by call"><i>00</i><small>FF7E（7,195Fに読む）</small></span>
+      <span class="by bad"><i>FF</i><small>FF7F（本来は7,197Fに読む）</small></span>
+    </div>
+    <p class="small">10回目の追い返しでは、7,197Fに読まれるのは赤い <span class="mono">FF</span>（$1A:FF7F）ではありません。2フレームの間に上位バイトが FF から FD に下がるので、この台本の外にある $1A:FD7F が読まれます。そのようすは、このあとの図で説明します。</p>
     <figcaption>条件判定 <code>28</code> は、判定の結果によって、次の2バイトを読み飛ばします。主人公が違うブロックでは <code>1E 0B</code> と <code>00 FF</code> が両方飛ばされ、次のブロックへ進みます。主人公が合うブロックでは、<code>1E 0B</code> を実行し、<code>00 FF</code> で終わります。ホークの場合、先頭から4番目のブロックの <code>00</code>（$1A:FF7E）まで、54バイトを同じフレームのうちに読み進みます。$1701 は音を鳴らす処理に渡す番号の置き場所です。条件が主人公の判定であることと、<code>1E 0B</code> が曲を切り替える処理であることは、並びからの推定です。</figcaption>
   </figure>
   <p>ここから先は「台本の切り替え」という命令が何度も出てきます。バグの動きを左右する命令なので、先に説明します。</p>
