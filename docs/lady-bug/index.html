@@ -280,6 +280,23 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     </table></div>
     <figcaption>1〜9回目は6番目の命令でメモが1枚ずつ残り、10回目は4番目の命令で12枚目に達します。10回目の追い返しでは、セリフのあと世界地図が出る前に、もうバグが始まっています。</figcaption>
   </figure>
+  <figure class="fig">
+    <h3>台本0x194の本来の中身（$1A:FF48〜FFAF、104バイト）</h3>
+    <p class="small">主人公ごとに違う曲番号を選んで鳴らすための台本です。同じ形のブロックが主人公の数だけ並んでいます。1ブロックは14バイトで、次の5つの命令でできています。</p>
+    <div class="bytes">
+      <span class="by cmd"><i>47 17 01 vv</i><small>曲番号vvを$1701に書く</small></span>
+      <span class="by cmd"><i>28 4n 0E</i><small>条件判定</small></span>
+      <span class="by cmd"><i>1E 0B</i><small>演出0x0B</small></span>
+      <span class="by cmd"><i>28 4n 0E</i><small>条件判定</small></span>
+      <span class="by call"><i>00 FF</i><small>台本0xFFへ切り替え＝終了</small></span>
+    </div>
+    <div class="scroll"><table>
+      <thead><tr><th>ブロック</th><th>場所</th><th>曲番号を書く命令</th><th>条件判定</th><th></th></tr></thead>
+      <tbody><tr><td class="n">1</td><td class="mono">$1A:FF48〜</td><td class="mono">47 17 01 1F</td><td class="mono">28 40 0E</td><td></td></tr><tr><td class="n">2</td><td class="mono">$1A:FF56〜</td><td class="mono">47 17 01 17</td><td class="mono">28 41 0E</td><td></td></tr><tr><td class="n">3</td><td class="mono">$1A:FF64〜</td><td class="mono">47 17 01 10</td><td class="mono">28 42 0E</td><td></td></tr><tr style="background:var(--win)"><td class="n">4</td><td class="mono">$1A:FF72〜</td><td class="mono">47 17 01 09</td><td class="mono">28 43 0E</td><td><b>TASの主人公（ホーク）はここ</b></td></tr><tr><td class="n">5</td><td class="mono">$1A:FF80〜</td><td class="mono">47 17 01 01</td><td class="mono">28 44 0E</td><td></td></tr><tr><td class="n">6</td><td class="mono">$1A:FF8E〜</td><td class="mono">47 17 01 07</td><td class="mono">28 45 0E</td><td></td></tr><tr><td class="n">7</td><td class="mono">$1A:FF9C〜</td><td class="mono">47 17 01 0B</td><td class="mono">28 46 0E</td><td></td></tr><tr><td class="n">8</td><td class="mono">$1A:FFAA〜</td><td class="mono">47 17 01 14</td><td class="muted">なし</td><td>条件判定も <span class="mono">00 FF</span> もなく、<span class="mono">1E 0B</span> で台本の終わりに達する</td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>条件判定 <code>28</code> は、判定の結果によって、次の2バイトを読み飛ばします。主人公が違うブロックでは <code>1E 0B</code> と <code>00 FF</code> が両方飛ばされ、次のブロックへ進みます。主人公が合うブロックでは、<code>1E 0B</code> を実行し、<code>00 FF</code> で終わります。ホークの場合、先頭から4番目のブロックの <code>00</code>（$1A:FF7E）まで、54バイトを同じフレームのうちに読み進みます。$1701 は音を鳴らす処理に渡す番号の置き場所です。条件が主人公の判定であることと、<code>1E 0B</code> が曲を切り替える処理であることは、並びからの推定です。</figcaption>
+  </figure>
   <p>ここから先は「台本の切り替え」という命令が何度も出てきます。バグの動きを左右する命令なので、先に説明します。</p>
   <figure class="fig">
     <h3>台本の切り替えとは</h3>
@@ -312,7 +329,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <li><b>読む場所が大きく飛ぶ</b>　ふだんのずれは1フレームに256バイトずつ手前へ下がるだけです。切り替えが起きると、読む場所が切り替え先の台本の先頭アドレスに入れ直されるので、離れた場所へ一気に移れます。12枚目のメモの読む場所は時計と同じ場所にあるので、このとき時計の値も一緒に書き換わります。</li>
     </ul>
   </figure>
-  <p>12枚目として呼ばれた台本0x194は、最後に「台本0xFFへ切り替える」命令 <code>00 FF</code> で終わります。台本0xFFは中身が「終了」だけの空の台本で、本来はここで11枚目に戻るはずでした。</p>
+  <p>12枚目として呼ばれた台本0x194は、主人公に合ったブロックの最後にある「台本0xFFへ切り替える」命令 <code>00 FF</code> で終わります。台本0xFFは中身が「終了」だけの空の台本で、本来はここで11枚目に戻るはずでした。</p>
   <figure class="fig">
     <div class="scroll">
     <svg viewBox="0 0 720 210" width="720" role="img" aria-label="切り替え命令の2バイトの間に2フレーム経過し、番号が別の場所から読まれる図">
