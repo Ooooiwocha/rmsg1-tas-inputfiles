@@ -115,6 +115,12 @@ ul.plain{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px;
 .quiz .ans b.v{font-family:var(--f-display);font-size:17px;margin-right:6px}
 .quiz li.ok .ans{border-color:var(--ok)} .quiz li.ok .ans b.v{color:var(--ok)}
 .quiz li.ng .ans{border-color:var(--hot)} .quiz li.ng .ans b.v{color:var(--hot)}
+.quiz details{margin-top:8px}
+.quiz summary{cursor:pointer;color:var(--accent);font-size:13.5px;width:fit-content}
+.quiz details>div{margin-top:8px;display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.75}
+.quiz details ol{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:6px}
+.quiz details ol li{background:none;border:0;border-radius:0;padding:0;display:list-item;list-style:decimal;counter-increment:none}
+.quiz details p{max-width:none}
 .score{font-family:var(--f-mono);font-size:14px;color:var(--muted)}
 footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
 </style>
@@ -616,7 +622,7 @@ const STEPS=[
 })();
 (function(){
 const Q=[
-["プレイ時間カウンタのとりうる値は0から3600であるから、最初のレイディバグ発火では3600通りに分岐する可能性がある。",false,"発火の瞬間にカウンタは台本のアドレスで上書きされ、最初の待ちは必ず 0x1AB8（6,840）から始まります。0になるまでの約1分54秒のあいだに読める場所は、バンク$00〜$1Bの各128区画で約3,580通りです。3600は、0になったあとに戻る値です。"],
+["プレイ時間カウンタのとりうる値は0から3600であるから、最初のレイディバグ発火では3600通りに分岐する可能性がある。",false,"発火の瞬間にカウンタは台本のアドレスで上書きされ、最初の待ちは必ず 0x1AB8（6,840）から始まります。0になるまでの約1分54秒のあいだに読める場所は、バンク$00〜$1Bの各128区画で3,584通りです。3600は、0になったあとに戻る値です。","<ol><li><b>押せるフレーム数</b>：カウンタは0x1AB8から毎フレーム1ずつ減り、押下は2フレーム後から受け付けられます。押した瞬間の値Tは0x1AB6から1までの6,838通りです。</li><li><b>値から読む場所へ</b>：Tを上位バイトbと下位バイトhに分けます。h≧0x80なら「バンクb・上位h」をそのまま読み、h＜0x80なら「バンクb＋1・上位h＋0x80」に直されます。区画内の位置（下位バイト）は常に0x18です。</li><li><b>そのまま読む区画</b>：b＝0x00〜0x19の26バンクは各128区画。b＝0x1Aは上限が0x1AB6なので、0x80〜0xB6の55区画だけです。</li><li><b>直されて読む区画</b>：b＝0x00〜0x1Aのそれぞれで128通りあり、バンク0x01〜0x1Bの27バンクの各128区画に届きます。</li><li><b>重なりを除く</b>：バンク$01〜$1Aでは3と4が同じ区画を指します。まとめると、$00が128、$01〜$19が各128、$1Aが128（55区画は両方から、残り73区画は4だけ）、$1Bが128です。</li><li><b>合計</b>：28バンク×128区画＝3,584通り。</li></ol><p>検算：ほとんどの区画は「そのまま」と「直されて」の2回通ります。1回だけなのは$00の128、$1Bの128、$1Aの73の計329区画なので、3,584×2−329−1＝6,838フレームとなり、1と合います（−1は、押せないT＝0のぶん）。</p><p>0になったあとの2周目以降（0x0E10から3,600フレーム）は、同じ計算で1,937通りです。すべて1周目に含まれます。</p>"],
 ["プレイ時間カウンタの値が 0x1A34 の場合と 0x1BB4 の場合は、どちらも $1B:B4xx を読む。",true,"下位バイトが0x80未満のときは「上位＋1、下位＋0x80」に直されます。0x1A34 は $1B:B4xx に直されるので、0x1BB4 と同じ場所になります。"],
 ["発火するときのカウンタの値は、それまでのプレイ時間によって変わる。",false,"11枚目のメモがカウンタの上に書かれるので、それまでの値は消えます。発火後の読む場所は、発火してから何フレーム目に押すかだけで決まります。"],
 ["港での追い返しが9回以下では、このバグは起きない。",true,"メモは追い返し1回につき1枚たまります。時計と重なるのは11枚目なので、10回目の追い返しで初めて起きます。"],
@@ -637,7 +643,9 @@ function build(){ ol.textContent=''; done=0; right=0; sc.textContent='0 / '+Q.le
       b.onclick=()=>{ if(!ans.hidden) return; b.setAttribute('aria-pressed','true'); ox.querySelectorAll('button').forEach(x=>x.disabled=true);
         const ok=o[1]===q[1]; li.classList.add(ok?'ok':'ng'); done++; if(ok) right++;
         const v=document.createElement('b'); v.className='v'; v.textContent=(ok?'正解':'不正解')+'（答えは'+(q[1]?'○':'×')+'）';
-        ans.appendChild(v); ans.appendChild(document.createTextNode(q[2])); ans.hidden=false;
+        ans.appendChild(v); ans.appendChild(document.createTextNode(q[2]));
+        if(q[3]){ const d=document.createElement('details'); const sm=document.createElement('summary'); sm.textContent='計算をステップごとに見る'; const bd=document.createElement('div'); bd.innerHTML=q[3]; d.appendChild(sm); d.appendChild(bd); ans.appendChild(d); }
+        ans.hidden=false;
         sc.textContent=done+' / '+Q.length+' 問に回答、'+right+' 問正解'; };
       ox.appendChild(b); });
     li.appendChild(st); li.appendChild(ox); li.appendChild(ans); ol.appendChild(li); }); }
