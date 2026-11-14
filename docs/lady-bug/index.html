@@ -321,6 +321,19 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     <div class="legend"><span style="--c:var(--accent)">バンク$1Aを読んでいる</span><span style="--c:var(--bank2)">バンク$1Bを読んでいる</span><span style="--c:var(--hot)">エンディング命令の場所</span></div>
     <figcaption>線が右下がりなのが「時計によるずれ」、垂直に跳ぶのが「台本の切り替え」です。下の表の行を押すと、その時点に印が付きます。</figcaption>
   </figure>
+  <figure class="fig">
+    <h3>エンディングを呼ぶ条件</h3>
+    <p class="small">エンディング開始の命令 <code>40 70</code> がある場所に、読む場所を合わせれば始まります。読む場所は直接指定できないので、次の3つをそろえる必要があります。</p>
+    <div class="scroll"><table>
+      <thead><tr><th>条件</th><th>$1B:B476 を狙う場合</th><th>TASでの満たし方</th></tr></thead>
+      <tbody>
+        <tr><td>1. バンク</td><td>バンク$1Bを読む状態になっている</td><td>台本を3回切り替え、バンク$1Bにある台本0x2A2に入る</td></tr>
+        <tr><td>2. 下位バイト</td><td>下位バイトが75の位置にあるボタン待ちで止まる（押すと次の76から読む）</td><td>$1B:C275 のボタン待ちに止まる</td></tr>
+        <tr><td>3. 上位バイト</td><td>上位バイトがB4になるフレームで押す</td><td>C2からB4まで減るのを14フレーム待ってAを押す</td></tr>
+      </tbody>
+    </table></div>
+    <figcaption><code>40 70</code> というバイト列は台本の領域に8か所あります（$1A:E3F8、$1B:AE33、AF88、B0B3、B1BE、B280、B3C2、B476）。どれに合わせても同じ命令が実行されます。少し手前に入っても、間の命令を読み進んで <code>40 70</code> に届く場合がありますが、途中でフレームを使う命令があると読む場所がまたずれるので、場所ごとに確かめる必要があります。B476以外の7か所へ実際に入れるかは、試していません。</figcaption>
+  </figure>
   <h3>概略版</h3>
   <div class="scroll"><table id="tasTable">
     <thead><tr><th>入力</th><th>読み始めた場所</th><th>起きたこと</th></tr></thead><tbody></tbody>
