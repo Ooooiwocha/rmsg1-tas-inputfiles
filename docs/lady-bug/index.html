@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>レイディバグはなぜ起きるのか 生成AIのClaudeが解説</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=IBM+Plex+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* layout: one reading column; each chapter = short text + one figure. Figures use the game's own vocabulary: hex bytes, a stack of records, a tape of 256-byte pages */
+:root{
+  --bg:#f2f4f9; --surface:#ffffff; --ink:#1b2140; --muted:#5a6282; --line:#d3d9e8;
+  --accent:#0d7c84; --win:#d3f1f2; --hot:#c22f4b; --count:#a86200; --bank2:#5548c8; --ok:#2c7a4b; --screen:#0b0d1a;
+  --f-display:"DotGothic16","Zen Kaku Gothic New",sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#11142a; --surface:#1a1f40; --ink:#e9ecf8; --muted:#9ea6c8; --line:#2f3663;
+  --accent:#62d2d8; --win:#173b46; --hot:#ff6f88; --count:#f3b84a; --bank2:#aaa1ff; --ok:#6fd096; --screen:#05060d; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#11142a; --surface:#1a1f40; --ink:#e9ecf8; --muted:#9ea6c8; --line:#2f3663;
+  --accent:#62d2d8; --win:#173b46; --hot:#ff6f88; --count:#f3b84a; --bank2:#aaa1ff; --ok:#6fd096; --screen:#05060d; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.85;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 72px}
+main{max-width:780px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(30px,6vw,46px);line-height:1.25;margin:0;text-wrap:balance;letter-spacing:.02em}
+h2{font-family:var(--f-display);font-weight:400;font-size:clamp(22px,4vw,28px);line-height:1.4;margin:0;text-wrap:balance}
+h3{font-size:16px;margin:0;font-weight:700}
+p{margin:0;max-width:38em}
+section{display:flex;flex-direction:column;gap:16px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;color:var(--accent);text-transform:uppercase}
+.lead{font-size:18px}
+.muted{color:var(--muted)} .small{font-size:13.5px;line-height:1.7}
+code,.mono{font-family:var(--f-mono);font-size:.92em}
+code{background:var(--win);padding:.05em .35em;border-radius:3px;white-space:nowrap}
+b.hot{color:var(--hot)} b.cnt{color:var(--count)}
+.fig{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.fig figcaption,.cap{font-size:13.5px;color:var(--muted);line-height:1.7}
+figure{margin:0}
+.scroll{overflow-x:auto}
+svg{display:block;max-width:100%;height:auto}
+svg text{font-family:var(--f-mono);fill:var(--ink)}
+.shot{image-rendering:pixelated;width:100%;max-width:512px;aspect-ratio:256/224;background:var(--screen);border-radius:4px;display:block}
+.row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.row>*{flex:1 1 280px;min-width:0}
+.btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;font-size:14px;padding:6px 14px;border-radius:4px;border:1px solid var(--accent);background:var(--surface);color:var(--accent);cursor:pointer}
+button.primary{background:var(--accent);color:var(--bg)}
+button:focus-visible{outline:2px solid var(--count);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+/* summary strip */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;counter-reset:s}
+.steps li{list-style:none;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;font-size:14.5px;line-height:1.65;counter-increment:s}
+.steps li::before{content:counter(s);font-family:var(--f-display);font-size:22px;color:var(--accent);display:block;line-height:1.2}
+ol.steps{margin:0;padding:0}
+/* bytes */
+.bytes{display:flex;flex-wrap:wrap;gap:6px 4px;font-family:var(--f-mono);font-size:13px}
+.by{display:inline-flex;flex-direction:column;align-items:center;gap:2px}
+.by i{font-style:normal;padding:3px 7px;border-radius:3px;border:1px solid var(--line);background:var(--bg);white-space:nowrap}
+.by small{font-family:var(--f-body);font-size:11px;color:var(--muted);white-space:nowrap}
+.by.cmd i{border-color:var(--accent);color:var(--accent)} .by.txt i{background:var(--win);border-color:transparent}
+.by.call i{border-color:var(--bank2);color:var(--bank2)} .by.bad i{border-color:var(--hot);color:var(--hot);font-weight:600}
+/* stack widget */
+.stackwrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:560px){.stackwrap{grid-template-columns:1fr}}
+.stack{display:flex;flex-direction:column-reverse;gap:3px}
+.slot{display:flex;gap:8px;align-items:center;font-family:var(--f-mono);font-size:12.5px;border:1px dashed var(--line);border-radius:3px;padding:3px 8px;min-height:27px;color:var(--muted)}
+.slot span:first-child{width:3.2em;flex:none}
+.slot.on{border-style:solid;border-color:var(--accent);color:var(--ink);background:var(--win)}
+.slot.top{border-color:var(--bank2)}
+.slot.s11{border-color:var(--count);color:var(--count)}
+.slot.s11.on{background:var(--hot);border-color:var(--hot);color:#fff}
+.say{background:var(--win);border-radius:14px;padding:10px 14px;font-size:14.5px;line-height:1.7;min-height:5.2em}
+/* tape widget */
+.readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;font-family:var(--f-mono);font-size:13px}
+.readout div{border:1px solid var(--line);border-radius:4px;padding:6px 10px}
+.readout b{display:block;font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+.readout small{font-family:var(--f-body);color:var(--muted);font-size:12px}
+/* tables */
+table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.6}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:500}
+td.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.pick{cursor:pointer} tr.pick.sel td{background:var(--win)}
+.tag{font-family:var(--f-mono);font-size:12px;padding:1px 6px;border-radius:3px;border:1px solid currentColor;white-space:nowrap}
+.tag.a{color:var(--accent)} .tag.x{color:var(--hot)} .tag.auto{color:var(--muted)}
+/* bars */
+.bars{display:flex;flex-direction:column;gap:10px}
+.bar{display:grid;grid-template-columns:minmax(0,1fr) 3.5em;gap:8px;align-items:center;font-size:14px}
+.bar .track{height:18px;background:var(--bg);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.bar .fill{height:100%;background:var(--accent)}
+.bar .lab{grid-column:1/-1;margin-bottom:-6px}
+.stackbar{display:flex;height:26px;border-radius:3px;overflow:hidden;border:1px solid var(--line)}
+.stackbar div{height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:var(--c)}
+.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.gallery figure{display:flex;flex-direction:column;gap:6px}
+.gallery figcaption{font-size:13px;line-height:1.6;color:var(--muted)}
+.gallery figcaption b{color:var(--ink);font-weight:700}
+ul.plain{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px;max-width:38em}
+footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
+</style>
+
+<main>
+<header style="display:flex;flex-direction:column;gap:16px">
+  <div class="eyebrow">ロマンシング サ・ガ（SFC・日本版）</div>
+  <h1>レイディバグは<br>なぜ起きるのか</h1>
+  <div style="font-family:var(--f-display);font-size:clamp(18px,3.4vw,24px);color:var(--accent);line-height:1.4">生成AIのClaudeが解説</div>
+  <p class="lead">港で10回追い返されると、ゲームが「どこまで台本を読んだか」のメモを、プレイ時間の時計と同じ場所に書いてしまいます。時計が進むたびにメモが書き換わり、関係のない場所のデータがイベントとして実行されます。</p>
+  <ol class="steps">
+    <li>追い返されるたびに、読みかけの台本のメモが1枚ずつ積まれる</li>
+    <li>11枚目のメモは、プレイ時間の時計と同じ場所に置かれる</li>
+    <li>時計が1フレーム進むごとに、読む場所が256バイト手前へずれる</li>
+    <li>押すタイミング次第で、戦闘もマップ移動もエンディングも起きる</li>
+  </ol>
+</header>
+
+<section>
+  <div class="eyebrow">1 ／ 台本</div>
+  <h2>イベントは「台本」を1バイトずつ読んで進む</h2>
+  <p>セリフも、マップ移動も、戦闘の開始も、ROMに書かれた「台本」というバイト列で指示されています。ゲームは台本を先頭から1バイトずつ読み、文字なら表示し、命令なら実行します。</p>
+  <div class="row">
+    <figure class="fig"><img class="shot" src="img/reject.gif" alt="港に入ると「海賊だ！おいはらえ！」と言われ、世界地図に戻される様子"><figcaption>追い返し1回ぶん（約3秒）。港に入る → 追い返される → 世界地図へ。</figcaption></figure>
+    <figure class="fig">
+      <h3>このとき読まれている台本（番号0x2E8）</h3>
+      <div class="bytes">
+        <span class="by cmd"><i>08 3F</i><small>港のマップへ</small></span>
+        <span class="by txt"><i>ここは だめだ！</i><small>文字</small></span>
+        <span class="by cmd"><i>12</i><small>ボタン待ち</small></span>
+        <span class="by txt"><i>ゴドンゴにまわろう</i><small>文字</small></span>
+        <span class="by cmd"><i>12</i><small>ボタン待ち</small></span>
+        <span class="by call"><i>1B 01 73</i><small>台本0x173を呼ぶ</small></span>
+        <span class="by cmd"><i>40 4B</i><small>メモを全部捨てて終了</small></span>
+      </div>
+      <figcaption>一部の命令は省略しています。最後の2つが、この後の話の主役です。台本の番号、番地、バイトの値はすべて16進数で、番号には 0x を付けています（0x173 は10進数の371）。</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">2 ／ 入れ子</div>
+  <h2>追い返されるたびに、メモが1枚たまる</h2>
+  <p>台本の途中で別の台本を呼ぶとき、ゲームは「元の台本をどこまで読んだか」をメモに残します。呼んだ台本が終われば、メモを見て元の続きに戻ります。</p>
+  <p>追い返しでは、台本0x2E8が「船で去る」台本0x173を呼びます。ところが台本0x173が終わる前に次の港に着き、次の港のイベントが始まってしまいます。台本0x173は戻らず、台本0x2E8の最後にある「メモを全部捨てる」命令は実行されません。</p>
+  <figure class="fig">
+    <div class="stackwrap">
+      <div>
+        <div class="stack" id="stack"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="say" id="stackSay"></div>
+        <div class="btns">
+          <button class="primary" id="btnPush">追い返される</button>
+          <button id="btnReset">最初から</button>
+          <span class="mono small muted" id="stackCount"></span>
+        </div>
+        <p class="small muted">メモは1枚8バイトで、メモリの <span class="mono">$129C</span> から順に並びます。置ける枚数に上限の確認はありません。</p>
+      </div>
+    </div>
+    <figcaption>「追い返される」を押すと、1回ぶん進みます。実際の記録でも、10回目のあとは0〜9段目がすべて台本0x2E8の「捨てる命令の直前」を指していました。</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="eyebrow">3 ／ 重なり</div>
+  <h2>11枚目のメモは、時計の上に書かれる</h2>
+  <p>メモは1枚8バイトで、中身は「読む場所の下位バイト・上位バイト・バンク（ROMの区画）」の3バイトと、台本の終了位置2バイトです。残り3バイトは使われません。11枚目が置かれる場所は、もともとプレイ時間を数えるカウンタの場所でした。</p>
+  <figure class="fig">
+    <div class="scroll">
+    <svg viewBox="0 0 720 262" width="720" role="img" aria-label="11段目のメモとプレイ時間カウンタが同じメモリに重なっている図">
+      <text x="0" y="14" font-size="12" fill="var(--muted)">メモリの番地</text>
+      <g font-size="12" text-anchor="middle">
+        <text x="150" y="14">$12F4</text><text x="290" y="14">$12F5</text><text x="430" y="14">$12F6</text><text x="570" y="14">$12F7〜</text>
+      </g>
+      <text x="0" y="58" font-size="12">11枚目のメモ</text>
+      <g stroke="var(--accent)" fill="var(--win)"><rect x="90" y="34" width="120" height="40" rx="3"/><rect x="230" y="34" width="120" height="40" rx="3"/><rect x="370" y="34" width="120" height="40" rx="3"/><rect x="510" y="34" width="200" height="40" rx="3"/></g>
+      <g font-size="12.5" text-anchor="middle" style="font-family:var(--f-body)">
+        <text x="150" y="59">読む場所・下位</text><text x="290" y="59">読む場所・上位</text><text x="430" y="59">バンク</text><text x="610" y="59">終了位置2バイト＋未使用3バイト</text>
+      </g>
+      <text x="0" y="128" font-size="12">本来の用途</text>
+      <g stroke="var(--line)" fill="var(--bg)"><rect x="90" y="104" width="120" height="40" rx="3"/><rect x="510" y="104" width="200" height="40" rx="3"/></g>
+      <rect x="230" y="104" width="260" height="40" rx="3" fill="none" stroke="var(--count)" stroke-width="2"/>
+      <g font-size="12.5" text-anchor="middle" style="font-family:var(--f-body)">
+        <text x="150" y="129" fill="var(--muted)">用途不明の変数</text><text x="360" y="129" fill="var(--count)">プレイ時間カウンタ（毎フレーム −1）</text><text x="610" y="129" fill="var(--muted)">メニュー操作用の変数など</text>
+      </g>
+      <g stroke="var(--hot)" stroke-width="2" fill="none"><path d="M290 76v26M430 76v26"/></g>
+      <text x="360" y="172" font-size="12.5" text-anchor="middle" fill="var(--hot)" style="font-family:var(--f-body)">同じ2バイトを、2つの仕組みが別の意味で使う</text>
+      <line x1="0" x2="720" y1="188" y2="188" stroke="var(--line)"/>
+      <text x="0" y="214" font-size="12">直前の値</text>
+      <g font-size="14" text-anchor="middle" fill="var(--muted)"><text x="150" y="214" fill="var(--muted)">00</text><text x="290" y="214" fill="var(--count)">9B</text><text x="430" y="214" fill="var(--count)">01</text><text x="610" y="214" fill="var(--muted)">00 00 00 00 00</text></g>
+      <text x="0" y="246" font-size="12">書かれる値</text>
+      <g font-size="14" text-anchor="middle" font-weight="600"><text x="150" y="246" fill="var(--hot)">48 ※</text><text x="290" y="246" fill="var(--hot)">FF</text><text x="430" y="246" fill="var(--hot)">1A</text><text x="610" y="246"><tspan fill="var(--hot)">B0 FF</tspan><tspan fill="var(--muted)" font-weight="400"> 00 00 00</tspan></text></g>
+    </svg>
+    </div>
+    <figcaption>下の2行は、7,195Fに台本0x194（$1A:FF48〜FFB0）が呼ばれたときの実際の値です。<b class="hot">※ 下位バイトの48は、書かれた直後だけの値です。台本0x194は同じフレームのうちに54バイト読み進むので、7,195Fが終わった時点では7Eになっています（5章の $1A:FF7E）。</b>カウンタは0x019Bから0x1AFFに書き換わり、次の1分が経つまでの残りが、約7秒から約1分55秒に化けます。カウンタは画面が1回更新されるたびに1減り、0になると3,600（1分ぶん）に戻ります。下位バイトの <span class="mono">$12F4</span> だけは重なっていないので、動きません。</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="eyebrow">4 ／ ずれ</div>
+  <h2>時計が進むと、読む場所が256バイトずつ手前へ飛ぶ</h2>
+  <p>上位バイトが1減ると、読む場所は256バイト手前に移ります。ボタン待ちで止まっている間も時計は進むので、<b>何フレーム目に押すか</b>で、次に読まれる場所が変わります。</p>
+  <figure class="fig">
+    <div class="readout">
+      <div><small>発火からのフレーム</small><b id="tF">0</b></div>
+      <div><small>カウンタ</small><b id="tC" style="color:var(--count)">0x1AB9</b></div>
+      <div><small>いま押すと読み始める場所</small><b id="tA" style="color:var(--hot)">$1A:B818</b></div>
+    </div>
+    <div class="scroll"><svg id="tape" viewBox="0 0 720 96" width="720" role="img" aria-label="ROMを256バイトごとの区画に分け、読む場所が左へ移る図"></svg></div>
+    <div class="btns">
+      <button class="primary" id="tPlay">再生</button><button id="tStep">1フレーム進める</button><button id="tReset">戻す</button>
+    </div>
+    <figcaption>四角1つが256バイト。赤い印が「いま押したら読み始める場所」です。区画の中での位置（下位バイト）は変わらず、区画だけが1つずつ左へ移ります。</figcaption>
+  </figure>
+  <figure class="fig">
+    <h3>待ち続けたときに読む場所（押すフレームごと）</h3>
+    <div class="scroll"><svg id="saw" viewBox="0 0 720 250" width="720" role="img" aria-label="押すフレームと読み始める場所の関係。128フレームごとにバンクが切り替わるのこぎり形"></svg></div>
+    <figcaption>ROMは各バンクの上半分（8000〜FFFF）にしかありません。下半分に入ると「次のバンクの上半分」へ送られるので、1A → 1B → 19 → 1A → 18 … と行きつ戻りつします。</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="eyebrow">5 ／ 最初の1歩</div>
+  <h2>最初の誤動作は、ボタンを押す前に起きている</h2>
+  <p>バグが始まるのは、10回目の追い返しで台本0x173が4番目の命令を実行した瞬間です。台本0x173は6つの命令でできていて、1〜9回目と10回目では、問題の起きる場所が違います。</p>
+  <figure class="fig">
+    <h3>台本0x173の中身（$1A:FA42〜、17バイト）</h3>
+    <div class="scroll"><table>
+      <thead><tr><th>順</th><th>バイト列</th><th>内容</th><th>1〜9回目</th><th>10回目</th></tr></thead>
+      <tbody>
+        <tr><td class="n">1</td><td class="mono" style="white-space:nowrap">0F F1</td><td>フィールド側の処理を呼ぶ（未解読）</td><td>実行</td><td>実行</td></tr>
+        <tr><td class="n">2</td><td class="mono" style="white-space:nowrap">47 18 D8 FF</td><td>番地$18D8にFFを書く</td><td>実行</td><td>実行</td></tr>
+        <tr><td class="n">3</td><td class="mono" style="white-space:nowrap">47 18 DA FF</td><td>番地$18DAにFFを書く</td><td>実行</td><td>実行</td></tr>
+        <tr><td class="n">4</td><td class="mono" style="white-space:nowrap">1B 01 94</td><td>台本0x194を呼ぶ（メモを1枚積む）</td><td>呼んで、すぐ戻る</td><td><b class="hot">11枚目のメモが時計の上に書かれる。ここでバグ発火</b></td></tr>
+        <tr><td class="n">5</td><td class="mono" style="white-space:nowrap">1E 14</td><td>演出0x14（約140フレーム）</td><td>実行</td><td class="muted">実行されない</td></tr>
+        <tr><td class="n">6</td><td class="mono" style="white-space:nowrap">1E 11</td><td>演出0x11</td><td><b class="cnt">途中で次の港のイベントが始まり、戻らない。メモが1枚残る</b></td><td class="muted">実行されない</td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>1〜9回目は6番目の命令でメモが1枚ずつ残り、10回目は4番目の命令で11枚目に達します。10回目の追い返しでは、セリフのあと世界地図が出る前に、もうバグが始まっています。</figcaption>
+  </figure>
+  <p>11枚目として呼ばれた台本0x194は、最後に「台本0xFFへ切り替える」命令 <code>00 FF</code> で終わります。台本0xFFは中身が「終了」だけの空の台本で、本来はここで10枚目に戻るはずでした。</p>
+  <figure class="fig">
+    <div class="scroll">
+    <svg viewBox="0 0 720 210" width="720" role="img" aria-label="切り替え命令の2バイトの間に2フレーム経過し、番号が別の場所から読まれる図">
+      <g font-size="12" fill="var(--muted)"><text x="0" y="16">フレーム</text><text x="150" y="16" text-anchor="middle">7,195</text><text x="360" y="16" text-anchor="middle">7,196</text><text x="570" y="16" text-anchor="middle">7,197</text></g>
+      <g stroke="var(--line)"><path d="M255 6v196M465 6v196"/></g>
+      <text x="0" y="60" font-size="12">読む場所</text>
+      <g font-size="14" text-anchor="middle"><text x="150" y="60">$1A:<tspan fill="var(--count)">FF</tspan>7E</text><text x="360" y="60">$1A:<tspan fill="var(--count)">FE</tspan>7F</text><text x="570" y="60">$1A:<tspan fill="var(--hot)">FD</tspan>7F</text></g>
+      <text x="0" y="112" font-size="12">起きること</text>
+      <g font-size="12.5" text-anchor="middle" style="font-family:var(--f-body)">
+        <rect x="80" y="88" width="140" height="38" rx="3" fill="var(--win)" stroke="var(--accent)"/><text x="150" y="112">1バイト目 00 を読む</text>
+        <rect x="290" y="88" width="140" height="38" rx="3" fill="var(--bg)" stroke="var(--line)"/><text x="360" y="112" fill="var(--muted)">切り替えの準備で待つ</text>
+        <rect x="500" y="88" width="140" height="38" rx="3" fill="none" stroke="var(--hot)" stroke-width="2"/><text x="570" y="112" fill="var(--hot)">2バイト目を読む → 8F</text>
+      </g>
+      <g font-size="12.5" style="font-family:var(--f-body)">
+        <text x="0" y="160" font-size="12" style="font-family:var(--f-mono)">結果</text>
+        <text x="80" y="160">本来：$1A:FF7F の <tspan style="font-family:var(--f-mono)">FF</tspan> を読んで台本0xFF（空）へ → 正常終了</text>
+        <text x="80" y="186" fill="var(--hot)">実際：$1A:FD7F の <tspan style="font-family:var(--f-mono)">8F</tspan> を読んで、無関係な台本0x8Fへ</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>切り替え命令は、1バイト目と2バイト目の間に2フレームかかります。その間に時計が2進み、2バイト目は512バイト手前の、酒場の噂話の文章の途中から読まれます。</figcaption>
+  </figure>
+  <p>こうして無関係な台本0x8Fが始まります。別のイベントの台本で、並びは次のとおりです。</p>
+  <figure class="fig">
+    <div class="bytes">
+      <span class="by txt"><i>（名前）しんじてたよ</i><small>暗転中に書かれる</small></span>
+      <span class="by bad"><i>12</i><small>ボタン待ち。ここで止まる</small></span>
+      <span class="by txt" style="opacity:.5"><i>さっさと ずらかろうぜ</i><small>読まれない</small></span>
+      <span class="by txt" style="opacity:.5"><i>…くせものめ つかまえろ</i><small>読まれない</small></span>
+    </div>
+    <figcaption>発火すると毎回、先頭の13バイトだけが自動で読まれ、ボタン待ちで止まります。画面は暗転したままなので何も見えません。待ちの後ろにあるセリフは、ボタンを押した瞬間に読む場所が別のところへ飛ぶので、読まれません。文字の読みは文字コードから割り出したものです。</figcaption>
+  </figure>
+  <figure class="fig">
+    <h3>暗転してから最初のボタン待ちまで（10回目の追い返し）</h3>
+    <div class="scroll"><table>
+      <thead><tr><th>フレーム</th><th>画面</th><th>裏で起きていること</th></tr></thead>
+      <tbody>
+        <tr><td class="n">7,180</td><td>「ゴドンゴにまわろう」</td><td>Aでセリフを送る。台本0x2E8が台本0x173を呼ぶ（10枚目のメモ）</td></tr>
+        <tr><td class="n">7,181〜7,194</td><td>だんだん暗くなる</td><td>台本0x173の1番目の命令。画面を暗転させている</td></tr>
+        <tr><td class="n">7,195</td><td>真っ暗</td><td>2〜4番目の命令。4番目で台本0x194を呼び、<b class="hot">11枚目のメモが時計の上に書かれる</b>。台本0x194は曲番号を選び、最後の <code>00 FF</code> の1バイト目まで読む</td></tr>
+        <tr><td class="n">7,196</td><td>真っ暗</td><td>切り替えの準備で待つ。時計が進み、読む場所がずれ始める</td></tr>
+        <tr><td class="n">7,197</td><td>真っ暗</td><td>2バイト目をずれた場所から読み、台本0x8Fが始まる。名前と6文字を書いて、ボタン待ちで止まる</td></tr>
+        <tr><td class="n">7,198〜</td><td>真っ暗</td><td>ボタン待ち。1フレームごとに、押したときの行き先が256バイトずつ変わる。押下が受け付けられるのは7,200Fから</td></tr>
+        <tr><td class="n">7,215</td><td>真っ暗</td><td>TASが最初のAを押す。$1A:A718 から読み始める（7章へ）</td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>プレイヤーから見ると、セリフを送ったあと画面が暗くなり、そのまま何も起きないように見えます。実際には暗転が終わって3フレーム後には、もうボタン待ちに入っています。暗転が1番目の命令の働きであることは、命令の順番と画面の明るさの記録からの推定です。</figcaption>
+  </figure>
+  <p>このボタン待ちを何フレーム目に抜けるかが、プレイヤーが結果を左右できる最初の操作です。</p>
+</section>
+
+<section>
+  <div class="eyebrow">6 ／ ボタン</div>
+  <h2>フレームを使う命令のたびに、また飛ぶ</h2>
+  <p>ずれるのはボタン待ちだけではありません。フレームを消費する命令は、どれも次に読む場所をずらします。1回押しただけで、台本があちこちへ飛び続けることがあるのはこのためです。</p>
+  <table>
+    <thead><tr><th>命令</th><th>かかる時間</th><th>次に読む場所</th></tr></thead>
+    <tbody>
+      <tr><td>ボタン待ち <code>12</code></td><td>押すまで</td><td>待ったフレーム数 × 256バイト手前</td></tr>
+      <tr><td>ウィンドウ切り替え <code>10</code> <code>11</code></td><td>2フレーム</td><td>512バイト手前</td></tr>
+      <tr><td>台本の切り替え <code>00</code>〜<code>03</code></td><td>2フレーム</td><td>番号の2バイト目が512バイト手前の別の値になる</td></tr>
+      <tr><td>閉じたウィンドウへの最初の1文字</td><td>6フレーム（Xで5）</td><td>1,536バイト手前（Xで1,280）</td></tr>
+    </tbody>
+  </table>
+  <p><b>Xボタン</b>は、ボタン待ちを抜ける働きが違うのではありませんでした。ウィンドウを開く途中の特定の1フレームでXが押されていると、開く時間が1フレーム縮みます。12種類のボタンで試して、縮むのはXだけでした。1フレーム縮めば、その後の行き先が256バイト変わります。</p>
+</section>
+
+<section>
+  <div class="eyebrow">7 ／ 応用</div>
+  <h2>TASは、本物のエンディング台本の最後の2バイトを読ませている</h2>
+  <p>7,279F版は8回の押下で台本を3回切り替え、エンディング演出の台本（番号0x277）の最後にある <code>40 70</code>（エンディング開始）へ、ちょうど読む場所を合わせています。</p>
+  <figure class="fig">
+    <div class="scroll"><svg id="tas" viewBox="0 0 720 330" width="720" role="img" aria-label="TASの経路。フレームごとの読む場所の推移"></svg></div>
+    <div class="legend"><span style="--c:var(--accent)">バンク$1Aを読んでいる</span><span style="--c:var(--bank2)">バンク$1Bを読んでいる</span><span style="--c:var(--hot)">エンディング命令の場所</span></div>
+    <figcaption>線が右下がりなのが「時計によるずれ」、垂直に跳ぶのが「台本の切り替え」です。下の表の行を押すと、その時点に印が付きます。</figcaption>
+  </figure>
+  <h3>概略版</h3>
+  <div class="scroll"><table id="tasTable">
+    <thead><tr><th>入力</th><th>読み始めた場所</th><th>起きたこと</th></tr></thead><tbody></tbody>
+  </table></div>
+  <figure class="fig">
+    <h3>詳細版：最初のAからエンディングまで、フレームごと</h3>
+    <div class="scroll"><table>
+      <thead><tr><th>フレーム</th><th>入力</th><th>読む場所</th><th>裏で起きていること</th></tr></thead>
+      <tbody>
+        <tr><td class="n">7,215</td><td><span class="tag a">A</span></td><td class="mono">$1A:A718</td><td>ボタン待ちを抜ける。待っていた間に上位がB9からA7まで減っている。「れたな！」の4文字を書き、$1A:A71C の <code>12</code> でボタン待ち</td></tr>
+        <tr><td class="n">7,216〜7,217</td><td></td><td></td><td class="muted">ボタン待ち</td></tr>
+        <tr><td class="n">7,218</td><td><span class="tag a">A</span></td><td class="mono">$1A:A41D</td><td>「さか」と記号2つ、名前の表示（<code>2D BB</code>）、漢字1文字、「が」と記号2つ。$1A:A428 の <code>12</code> でボタン待ち</td></tr>
+        <tr><td class="n">7,219〜7,220</td><td></td><td></td><td class="muted">ボタン待ち</td></tr>
+        <tr><td class="n">7,221</td><td><span class="tag a">A</span></td><td class="mono">$1A:A129</td><td>行送り（<code>24</code>）、記号を1つ書く（<code>2F 28</code>）、「ビ」。$1A:A12D で台本切り替えの1バイト目 <code>00</code> を読む</td></tr>
+        <tr><td class="n">7,222</td><td></td><td></td><td class="muted">切り替えの準備で待つ</td></tr>
+        <tr><td class="n">7,223</td><td></td><td class="mono">$1A:9F2E</td><td>2バイト目として 8B を読む。<b class="cnt">台本0x8B（$1A:B819）へ切り替わる</b>。記号、空白、「あのおとぎばなしの」、記号の12文字を書き、$1A:B825 の <code>12</code> でボタン待ち</td></tr>
+        <tr><td class="n">7,224〜7,226</td><td></td><td></td><td class="muted">ボタン待ち</td></tr>
+        <tr><td class="n">7,227</td><td><span class="tag a">A</span></td><td class="mono">$1A:B426</td><td>「ほうびを とらせよう」の10文字を書き、$1A:B430 の <code>12</code> でボタン待ち</td></tr>
+        <tr><td class="n">7,228〜7,234</td><td></td><td></td><td class="muted">ボタン待ち</td></tr>
+        <tr><td class="n">7,235</td><td><span class="tag a">A</span></td><td class="mono">$1A:AC31</td><td>「ャ」。$1A:AC32 で台本切り替えの1バイト目 <code>00</code> を読む</td></tr>
+        <tr><td class="n">7,236</td><td></td><td></td><td class="muted">切り替えの準備で待つ</td></tr>
+        <tr><td class="n">7,237</td><td></td><td class="mono">$1A:AA33</td><td>2バイト目として A2 を読む。<b class="cnt">台本0xA2（$1A:C098）へ切り替わる</b>。漢字を1文字書く</td></tr>
+        <tr><td class="n">7,238〜7,239</td><td></td><td></td><td class="muted">文字の表示に3フレームかかる（理由は未確認）</td></tr>
+        <tr><td class="n">7,240</td><td></td><td class="mono">$1A:BD9A</td><td>「ち」、フラグの条件判定を2つ（<code>28 45 0E</code>、<code>28 42 0E</code>）、名前の表示、「のため」と記号。$1A:BDAB の <code>11</code> でウィンドウを切り替える</td></tr>
+        <tr><td class="n">7,241</td><td></td><td></td><td class="muted">ウィンドウ切り替えで待つ</td></tr>
+        <tr><td class="n">7,242</td><td></td><td class="mono">$1A:BBAC</td><td>記号を1つ読む。切り替え先のウィンドウが閉じているので、開き始める</td></tr>
+        <tr><td class="n">7,243〜7,246</td><td><span class="tag x">X</span> 7,244</td><td></td><td>ウィンドウを開いている最中。<b class="hot">7,244FのXで、6フレームかかるところが5フレームで済む</b></td></tr>
+        <tr><td class="n">7,247</td><td></td><td class="mono">$1A:B6AD</td><td>「ある」。<code>1B 01 F8</code> で台本0x1F8（$1B:8A4D）を呼ぶ（12枚目のメモ）。条件判定、「の」、条件判定のあと、<code>00 FF</code> の1バイト目を読む</td></tr>
+        <tr><td class="n">7,248</td><td></td><td></td><td class="muted">切り替えの準備で待つ</td></tr>
+        <tr><td class="n">7,249</td><td></td><td class="mono">$1B:8A57</td><td>2バイト目の FF を正しく読む。12枚目のメモは時計と重なっていないので、ずれない。空の台本0xFFが終わり、11枚目に戻る</td></tr>
+        <tr><td class="n">7,250</td><td></td><td></td><td class="muted">戻る処理で待つ。12枚目にいた4フレームの間も、11枚目の読む場所はずれ続けている</td></tr>
+        <tr><td class="n">7,251</td><td></td><td class="mono">$1A:B2B2</td><td><code>11</code> でウィンドウを切り替える</td></tr>
+        <tr><td class="n">7,252</td><td></td><td></td><td class="muted">ウィンドウ切り替えで待つ</td></tr>
+        <tr><td class="n">7,253</td><td></td><td class="mono">$1A:B0B3</td><td>記号を1つ読む。閉じているウィンドウを開き始める</td></tr>
+        <tr><td class="n">7,254〜7,257</td><td><span class="tag x">X</span> 7,255</td><td></td><td>ウィンドウを開いている最中。<b class="hot">7,255FのXで、ここも5フレームで済む</b></td></tr>
+        <tr><td class="n">7,258</td><td></td><td class="mono">$1A:ABB4</td><td>フラグの判定（<code>3A 1E 01</code>）。$1A:ABB7 で台本切り替えの1バイト目 <code>02</code> を読む</td></tr>
+        <tr><td class="n">7,259</td><td></td><td></td><td class="muted">切り替えの準備で待つ</td></tr>
+        <tr><td class="n">7,260</td><td></td><td class="mono">$1A:A9B8</td><td>2バイト目として A2 を読む。<b class="cnt">台本0x2A2（$1B:C669）へ切り替わり、バンク$1Bに入る</b>。名前の表示、「には 」、名前の表示、「という」。$1B:C673 の <code>10</code> でウィンドウを切り替える</td></tr>
+        <tr><td class="n">7,261</td><td></td><td></td><td class="muted">ウィンドウ切り替えで待つ</td></tr>
+        <tr><td class="n">7,262</td><td></td><td class="mono">$1B:C474</td><td>「ん」を書く（2フレームかかる）</td></tr>
+        <tr><td class="n">7,263</td><td></td><td></td><td class="muted">文字の表示で待つ</td></tr>
+        <tr><td class="n">7,264</td><td></td><td class="mono">$1B:C275</td><td><code>12</code> でボタン待ち。下位バイトが75の位置で止まるのが、この経路の要点</td></tr>
+        <tr><td class="n">7,265〜7,277</td><td></td><td></td><td class="muted">ボタン待ち。上位がC2からB4まで減るのを待つ</td></tr>
+        <tr><td class="n">7,278</td><td><span class="tag a">A</span></td><td class="mono">$1B:B476</td><td><b class="hot"><code>40 70</code> を読む。エンディング開始</b></td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>この間、画面はずっと真っ暗です。「」の中は、読まれたバイトを文字コード表で読み替えたものです。セリフの途中から読んでいるので、断片になっています。「記号」は文字コードF7・F9、「漢字」は3Fで始まる2バイトの文字で、どの字かは特定できていません。「名前の表示」は人物名などを差し込む命令です。灰色の行は「何も読まずに時計だけが進む」フレームで、そのフレーム数だけ次に読む場所が256バイトずつ手前へずれます。台本の切り替えでは、読む場所が切り替え先の台本の先頭に入れ直されます。</figcaption>
+  </figure>
+  <figure class="fig"><img class="shot" src="img/ending.png" alt="エンディングの一場面"><figcaption>最後のAから少し後のエンディングの画面。</figcaption></figure>
+</section>
+
+<section>
+  <div class="eyebrow">8 ／ できること</div>
+  <h2>押すタイミングを変えると、何が起きるか</h2>
+  <p>最初の待ちから押すフレームを200通りに変えて、実行された命令を記録しました。どれも、ROMにもとからある台本を途中から実行した結果です。</p>
+  <div class="gallery">
+    <figure><img class="shot" src="img/battle.png" alt="骸骨の敵との戦闘画面"><figcaption><b>戦闘が始まる</b>　命令 <code>0E 01</code>。2バイト目が敵の種別です。</figcaption></figure>
+    <figure><img class="shot" src="img/warp.png" alt="建物の中のマップ"><figcaption><b>別のマップへ移る</b>　命令 <code>06 01</code> など。建物の中に出ました。</figcaption></figure>
+    <figure><img class="shot" src="img/worldmap2.png" alt="別の地域の世界地図"><figcaption><b>別の地域の世界地図</b>　命令 <code>08 46</code> など。</figcaption></figure>
+    <figure><img class="shot" src="img/boss.png" alt="最終ボスと思われる敵との戦闘画面"><figcaption><b>最終ボスと思われる戦闘</b>　A連打の途中で出た画面です。</figcaption></figure>
+    <figure><img class="shot" src="img/name.png" alt="名前入力の画面"><figcaption><b>名前入力の画面</b>　これもA連打の途中で出ました。</figcaption></figure>
+    <figure><img class="shot" src="img/shop.png" alt="店の中に船の姿の主人公がいる"><figcaption><b>船のまま店の中へ</b>　復帰後、主人公が船の姿のままでした。</figcaption></figure>
+  </div>
+  <p class="small muted">このほか、フラグの変更（200通り中49）や、戦闘回数・現在のマップ番号への書き込みも起きていました。リバイアサンと戦闘になる <code>0E F0</code> の経路があるかは、探していません。</p>
+</section>
+
+<section>
+  <div class="eyebrow">9 ／ 復帰</div>
+  <h2>ボタンを押し続ければ、半分ほどは操作できる状態に戻る</h2>
+  <p>発火後にAを連打し続けると、台本を次々に読み進めた末に、入れ子が全部片づいて主人公を動かせる状態に戻ることがあります。200通りの押し始めのタイミングで試しました。</p>
+  <div class="row">
+    <figure class="fig"><img class="shot" src="img/recover.gif" alt="暗転した画面でAを連打すると港の画面に戻り、船を動かせるようになる様子"><figcaption>暗転のままAを連打 → 港に戻り、船を動かせる（早回し）。</figcaption></figure>
+    <figure class="fig">
+      <h3>操作できる状態に戻った数（200通り中）</h3>
+      <div class="bars">
+        <div class="bar"><div class="lab">Aを毎秒10回、40秒間</div><div class="track"><div class="fill" style="width:45.5%"></div></div><div class="mono">91</div></div>
+        <div class="bar"><div class="lab">さらにAを約2分</div><div class="track"><div class="fill" style="width:48%"></div></div><div class="mono">96</div></div>
+        <div class="bar"><div class="lab">さらにB・Y・Start・十字も混ぜて約1分</div><div class="track"><div class="fill" style="width:54%"></div></div><div class="mono">108</div></div>
+      </div>
+      <h3>最終的な内訳</h3>
+      <div class="stackbar" role="img" aria-label="復帰108、戦闘などで止まる45、11〜12段目で止まる33、10段目で止まる14">
+        <div style="width:54%;background:var(--accent)"></div><div style="width:22.5%;background:var(--hot)"></div><div style="width:16.5%;background:var(--bank2)"></div><div style="width:7%;background:var(--count)"></div>
+      </div>
+      <div class="legend"><span style="--c:var(--accent)">復帰 108</span><span style="--c:var(--hot)">入れ子は片づいたが操作不能 45（うち戦闘のまま約34）</span><span style="--c:var(--bank2)">11〜12段目で停止 33</span><span style="--c:var(--count)">10段目で停止 14</span></div>
+    </figure>
+  </div>
+  <ul class="plain small">
+    <li>戻るまでの時間は2〜30秒で、15秒前後が最も多くなりました。</li>
+    <li>連打の速さを毎秒30回・10回・5回に変えても、戻る割合はほぼ同じでした。ただし、どのタイミングで戻れるかは入れ替わります。</li>
+    <li>戻ったあとはバグの前と同じ状態ではありません。途中の命令でフラグやマップが変わっています。メニューやセーブ、その先の進行は確かめていません。</li>
+  </ul>
+</section>
+
+<section>
+  <div class="eyebrow">10 ／ 限界</div>
+  <h2>できないことと、まだ分かっていないこと</h2>
+  <div class="row">
+    <div><h3>できないこと</h3><ul class="plain small">
+      <li>読む場所を自由に指定すること。選べるのは「何フレーム目に押すか」と「Xを使うか」だけです。</li>
+      <li>RAMの内容（名前や所持品）を命令として実行させること。読む場所は常にROMの中に補正されます。</li>
+      <li>追い返し9回以下で起こすこと。11枚目に達して初めて時計と重なります。</li>
+    </ul></div>
+    <div><h3>未確認</h3><ul class="plain small">
+      <li>次の港のイベントが始まる瞬間と、Xが効く箇所のプログラム上の場所。</li>
+      <li>60種類の命令と約120種類の副命令の大半の意味。</li>
+      <li>本物のスーパーファミコンでの再現。すべてエミュレーター（BizHawk 2.11.1、BSNESv115+）上の結果です。</li>
+    </ul></div>
+  </div>
+</section>
+
+<footer>アドレスは日本版ROMのもの、フレーム番号はTAS入力ファイル（7,279F版）の行番号です。イベント処理が読んだバイトを1つずつ記録する方法と、プログラムの逆アセンブルで確かめました。詳しい根拠は文書「レイディバグの仕組み」にあります。</footer>
+</main>
+
+<script>
+(function(){
+const NS='http://www.w3.org/2000/svg';
+const el=(t,a,p,txt)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;if(p)p.appendChild(e);return e};
+const hex=(v,n)=>v.toString(16).toUpperCase().padStart(n,'0');
+
+/* ---- stack widget ---- */
+const stack=document.getElementById('stack'),say=document.getElementById('stackSay'),cnt=document.getElementById('stackCount');
+const bPush=document.getElementById('btnPush');
+let n=10,over=false;
+function drawStack(){
+  stack.innerHTML='';
+  for(let i=0;i<=11;i++){
+    const d=document.createElement('div');d.className='slot'+(i===11?' s11':'');
+    let t='';
+    if(i<n){d.classList.add('on');t='台本0x2E8（捨てる命令の直前）'}
+    else if(i===n&&n>0&&n<=10&&!(n===10&&over)){d.classList.add('on','top');t='台本0x173（船で去る途中）'}
+    else if(i===10&&over){d.classList.add('on','top');t='台本0x173（船で去る途中）'}
+    if(i===11){t=over?'台本0x194 ← 時計と同じ場所！':'ここは時計（プレイ時間カウンタ）の場所'; if(over)d.classList.add('on')}
+    if(i===n&&n===0){t=''}
+    d.innerHTML='<span>'+i+'段目</span><span>'+t+'</span>';stack.appendChild(d);
+  }
+  cnt.textContent='追い返し '+n+' 回';
+  bPush.disabled=over;
+  bPush.textContent=(n===10&&!over)?'台本0x194を呼ぶ':'追い返される';
+  say.textContent= over?'10回目の途中で台本0x173が台本0x194を呼び、11枚目のメモが時計の上に書かれました。ここからバグが始まります。'
+    : n===0?'まだ何も積まれていません。港に入ってみましょう。'
+    : n<10?'台本0x173は戻らないまま、次の港のイベントが同じ段で始まります。下の段には台本0x2E8のメモが残ります。'
+    : '10回追い返されました。メモは0〜10段目まで埋まっています。この途中で台本0x173がもう1つ台本を呼ぶと…';
+}
+bPush.onclick=()=>{ if(n<10)n++; else over=true; drawStack() };
+document.getElementById('btnReset').onclick=()=>{n=0;over=false;drawStack()};
+drawStack();
+
+/* ---- address model: press at k frames after the first wait ---- */
+function addr(k){ const T=0x1AB8-k; let bank=T>>8, hi=T&0xFF; if(hi<0x80){bank+=1;hi|=0x80} return {bank,hi,T:T+1} }
+
+/* ---- tape widget ---- */
+const tape=document.getElementById('tape');let tk=0,timer=null;const COLS=14,W=48;
+function drawTape(){
+  tape.innerHTML='';
+  const a=addr(tk); const start=a.hi+3; // leftmost shows lower pages: draw descending to the left
+  for(let i=0;i<COLS;i++){
+    const hi=a.hi+ (COLS-4-i) ; // pointer sits at column COLS-4 initially, moves left as hi shrinks → keep pointer fixed col, labels scroll
+  }
+  // fixed page labels for bank 1A pages B9..AC ; pointer moves left
+  const top=0xB8;
+  for(let i=0;i<COLS;i++){
+    const hi=top-(COLS-1-i);
+    const x=4+i*(W+3);
+    el('rect',{x,y:26,width:W,height:40,rx:3,fill:'var(--bg)',stroke:'var(--line)'},tape);
+    el('text',{x:x+W/2,y:18,'font-size':11,'text-anchor':'middle',fill:'var(--muted)'},tape,hex(hi,2)+'xx');
+  }
+  const col=(COLS-1)-(top-a.hi);
+  if(col>=0){
+    const x=4+col*(W+3);
+    el('rect',{x,y:26,width:W,height:40,rx:3,fill:'var(--win)',stroke:'var(--hot)','stroke-width':2},tape);
+    el('rect',{x:x+W*0x18/256-1.5,y:26,width:3,height:40,fill:'var(--hot)'},tape);
+    el('text',{x:x+W/2,y:86,'font-size':11,'text-anchor':'middle',fill:'var(--hot)'},tape,'ここ');
+  }
+  el('text',{x:4,y:86,'font-size':11,fill:'var(--muted)'},tape,'バンク$1A　← 手前（小さい番地）');
+  document.getElementById('tF').textContent=tk;
+  document.getElementById('tC').textContent='0x'+hex(0x1AB9-tk,4);
+  document.getElementById('tA').textContent='$'+hex(a.bank,2)+':'+hex(a.hi,2)+'18';
+}
+function stopT(){if(timer){clearInterval(timer);timer=null;document.getElementById('tPlay').textContent='再生'}}
+document.getElementById('tStep').onclick=()=>{stopT();tk=(tk+1)%14;drawTape()};
+document.getElementById('tReset').onclick=()=>{stopT();tk=0;drawTape()};
+document.getElementById('tPlay').onclick=()=>{ if(timer){stopT();return} document.getElementById('tPlay').textContent='止める'; timer=setInterval(()=>{tk=(tk+1)%14;drawTape()},450) };
+drawTape();
+
+/* ---- sawtooth chart ---- */
+(function(){
+  const s=document.getElementById('saw'),L=64,R=706,T=18,B=206,K=900;
+  const X=k=>L+(R-L)*k/K, Y=a=>B-(B-T)*(a-0x8000)/0x7FFF;
+  for(const a of [0x8000,0xA000,0xC000,0xE000,0xFFFF]){ el('line',{x1:L,x2:R,y1:Y(a),y2:Y(a),stroke:'var(--line)'},s); el('text',{x:L-6,y:Y(a)+4,'font-size':11,'text-anchor':'end',fill:'var(--muted)'},s,hex(a,4)); }
+  for(let k=0;k<=K;k+=150){ el('text',{x:X(k),y:B+16,'font-size':11,'text-anchor':'middle',fill:'var(--muted)'},s,(7198+k).toLocaleString()); }
+  el('text',{x:(L+R)/2,y:B+36,'font-size':11.5,'text-anchor':'middle',fill:'var(--muted)',style:'font-family:var(--f-body)'},s,'押すフレーム');
+  el('text',{x:4,y:10,'font-size':11.5,fill:'var(--muted)',style:'font-family:var(--f-body)'},s,'読み始める番地（バンク内）');
+  let k=2;
+  while(k<K){ const a=addr(k); let e=k; while(e+1<K && addr(e+1).bank===a.bank && addr(e+1).hi===addr(e).hi-1) e++;
+    const b=addr(e); const c=(a.bank%2===0)?'var(--accent)':'var(--bank2)';
+    el('line',{x1:X(k),y1:Y(a.hi*256+0x18),x2:X(e),y2:Y(b.hi*256+0x18),stroke:c,'stroke-width':2.5,'stroke-linecap':'round'},s);
+    el('text',{x:(X(k)+X(e))/2+10,y:Y((a.hi+b.hi)/2*256)-8,'font-size':12,'text-anchor':'middle',fill:c},s,'$'+hex(a.bank,2));
+    k=e+1; }
+})();
+
+/* ---- TAS chart ---- */
+const TR=[[7198,26,185,23],[7199,26,184,23],[7200,26,183,23],[7201,26,182,23],[7202,26,181,23],[7203,26,180,23],[7204,26,179,23],[7205,26,178,23],[7206,26,177,23],[7207,26,176,23],[7208,26,175,23],[7209,26,174,23],[7210,26,173,23],[7211,26,172,23],[7212,26,171,23],[7213,26,170,23],[7214,26,169,23],[7215,26,168,23],[7216,26,167,28],[7217,26,166,28],[7218,26,165,28],[7219,26,164,40],[7220,26,163,40],[7221,26,162,40],[7222,26,161,45],[7223,26,160,45],[7224,26,184,37],[7225,26,183,37],[7226,26,182,37],[7227,26,181,37],[7228,26,180,48],[7229,26,179,48],[7230,26,178,48],[7231,26,177,48],[7232,26,176,48],[7233,26,175,48],[7234,26,174,48],[7235,26,173,48],[7236,26,172,50],[7237,26,171,50],[7238,26,192,153],[7239,26,191,153],[7240,26,190,153],[7241,26,189,171],[7242,26,188,171],[7243,26,187,172],[7244,26,186,172],[7245,26,185,172],[7246,26,184,172],[7247,26,183,172],[7248,26,182,178],[7249,26,181,178],[7250,26,180,178],[7251,26,179,178],[7252,26,178,178],[7253,26,177,178],[7254,26,176,179],[7255,26,175,179],[7256,26,174,179],[7257,26,173,179],[7258,26,172,179],[7259,26,171,183],[7260,26,170,183],[7261,27,198,115],[7262,27,197,115],[7263,27,196,116],[7264,27,195,116],[7265,27,194,117],[7266,27,193,117],[7267,27,192,117],[7268,27,191,117],[7269,27,190,117],[7270,27,189,117],[7271,27,188,117],[7272,27,187,117],[7273,27,186,117],[7274,27,185,117],[7275,27,184,117],[7276,27,183,117],[7277,27,182,117],[7278,27,181,117]];
+const STEPS=[
+ [7215,'a','A','$1A:A718','文字を4つ表示して、次のボタン待ちへ'],
+ [7218,'a','A','$1A:A41D','文字と名前を表示して、次のボタン待ちへ'],
+ [7221,'a','A','$1A:A129','切り替え命令を踏む。番号の2バイト目が8Bになり、台本0x8Bへ'],
+ [7227,'a','A','$1A:B426','文字を10個表示して、次のボタン待ちへ'],
+ [7235,'a','A','$1A:AC31','切り替え命令を踏む。番号が0xA2になり、台本0xA2へ'],
+ [7240,'auto','自動','$1A:BD9A','条件判定、名前表示のあと、ウィンドウ切り替え（2フレーム）'],
+ [7244,'x','X','$1A:BBAC','文字を1つ表示。ウィンドウを開く時間がXで5フレームに縮む'],
+ [7247,'auto','自動','$1A:B6AD','台本0x1F8を12段目として呼ぶ。すぐ11段目に戻る'],
+ [7255,'x','X','$1A:B0B3','文字を1つ表示。ここもXで5フレームに縮む'],
+ [7258,'auto','自動','$1A:ABB4','切り替え命令を踏む。台本0x2A2へ。ここでバンク$1Bに入る'],
+ [7264,'auto','自動','$1B:C275','文字を表示したあと、ボタン待ちで止まる'],
+ [7278,'a','A','$1B:B476','40 70 を読む。エンディング開始']];
+(function(){
+  const s=document.getElementById('tas'),L=64,R=706,T=22,B=286,F0=7198,F1=7279;
+  const X=f=>L+(R-L)*(f-F0)/(F1-F0), Y=a=>B-(B-T)*(a-0x9C00)/(0xCA00-0x9C00);
+  for(const a of [0xA000,0xA800,0xB000,0xB800,0xC000,0xC800]){ el('line',{x1:L,x2:R,y1:Y(a),y2:Y(a),stroke:'var(--line)'},s); el('text',{x:L-6,y:Y(a)+4,'font-size':11,'text-anchor':'end',fill:'var(--muted)'},s,hex(a,4)); }
+  for(let f=7200;f<=7270;f+=10){ el('text',{x:X(f),y:B+16,'font-size':11,'text-anchor':'middle',fill:'var(--muted)'},s,f.toLocaleString()); }
+  el('text',{x:4,y:12,'font-size':11.5,fill:'var(--muted)',style:'font-family:var(--f-body)'},s,'読む番地（バンク内）');
+  el('text',{x:(L+R)/2,y:B+36,'font-size':11.5,'text-anchor':'middle',fill:'var(--muted)',style:'font-family:var(--f-body)'},s,'フレーム');
+  // ending target
+  el('line',{x1:L,x2:R,y1:Y(0xB476),y2:Y(0xB476),stroke:'var(--hot)','stroke-dasharray':'4 4'},s);
+  el('text',{x:R-4,y:Y(0xB476)+16,'font-size':11.5,'text-anchor':'end',fill:'var(--hot)'},s,'$1B:B476  40 70');
+  // presses
+  for(const st of STEPS){ if(st[1]==='auto')continue; const c=st[1]==='x'?'var(--hot)':'var(--accent)';
+    el('line',{x1:X(st[0]),x2:X(st[0]),y1:T,y2:B,stroke:c,'stroke-opacity':.35},s);
+    el('text',{x:X(st[0]),y:T-6,'font-size':11.5,'text-anchor':'middle',fill:c,'font-weight':600},s,st[2]); }
+  // trace
+  for(let i=0;i<TR.length-1;i++){ const p=TR[i],q=TR[i+1]; const a=p[2]*256+p[3], b=q[2]*256+q[3]; const c=p[1]===26?'var(--accent)':'var(--bank2)';
+    el('line',{x1:X(p[0]),y1:Y(a),x2:X(q[0]),y2:Y(a-256),stroke:c,'stroke-width':2.5,'stroke-linecap':'round'},s);
+    if(Math.abs(b-(a-256))>300) el('line',{x1:X(q[0]),y1:Y(a-256),x2:X(q[0]),y2:Y(b),stroke:'var(--muted)','stroke-dasharray':'2 3'},s); }
+  const last=TR[TR.length-1]; el('circle',{cx:X(7278),cy:Y(0xB476),r:5,fill:'var(--hot)'},s);
+  for(const [f,a,t] of [[7224,0xB825,'台本0x8B'],[7238,0xC099,'台本0xA2'],[7261,0xC673,'台本0x2A2（バンク$1B）']])
+    el('text',{x:X(f)+5,y:Y(a)-6,'font-size':11.5,fill:'var(--ink)',style:'font-family:var(--f-body)'},s,t);
+  const cur=el('line',{x1:0,x2:0,y1:T,y2:B,stroke:'var(--count)','stroke-width':2,visibility:'hidden'},s);
+  const tb=document.querySelector('#tasTable tbody');
+  STEPS.forEach((st,i)=>{ const tr=document.createElement('tr'); tr.className='pick'; tr.tabIndex=0;
+    tr.innerHTML='<td style="white-space:nowrap"><span class="mono">'+st[0].toLocaleString()+'</span> <span class="tag '+st[1]+'">'+st[2]+'</span></td><td class="mono" style="white-space:nowrap">'+st[3]+'</td><td>'+st[4]+'</td>';
+    const pick=()=>{ tb.querySelectorAll('tr').forEach(r=>r.classList.remove('sel')); tr.classList.add('sel'); cur.setAttribute('x1',X(st[0])); cur.setAttribute('x2',X(st[0])); cur.setAttribute('visibility','visible') };
+    tr.onclick=pick; tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick()}}; tb.appendChild(tr); });
+})();
+})();
+</script>
+
+</body>
+</html>
