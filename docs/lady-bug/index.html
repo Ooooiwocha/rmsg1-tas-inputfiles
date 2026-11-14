@@ -304,7 +304,8 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <span class="by call"><i>00</i><small>FF7E（7,195Fに読む）</small></span>
       <span class="by bad"><i>FF</i><small>FF7F（本来は7,197Fに読む）</small></span>
     </div>
-    <p class="small">10回目の追い返しでは、7,197Fに読まれるのは赤い <span class="mono">FF</span>（$1A:FF7F）ではありません。2フレームの間に上位バイトが FF から FD に下がるので、この台本の外にある $1A:FD7F が読まれます。そのようすは、このあとの図で説明します。</p>
+    <p class="small">10回目の追い返しでは、7,197Fに読まれるのは赤い <span class="mono">FF</span>（$1A:FF7F に書かれた値）ではありません。時計が減らすのは「読む場所」のアドレスのほうです。2フレームの間に、アドレスの上位バイトが FF から FD に下がるので、読む場所が $1A:FF7F から $1A:FD7F に変わります。$1A:FD7F はこの台本の外で、そこに書かれている値は 8F です。その結果、命令は <span class="mono">00 FF</span> ではなく <span class="mono">00 8F</span> として実行されます。</p>
+    <p class="small">まぎらわしいのですが、ここには FF が2つ出てきます。アドレス $1A:<b>FF</b>7F の上位バイトの FF と、その場所に書かれている値の FF です。時計で変わるのは前者だけで、ROMに書かれた値は変わりません。FF が 8F に減るのではなく、読む場所がずれて、別の場所にあった 8F を読む、ということです。</p>
     <figcaption>条件判定 <code>28</code> は、判定の結果によって、次の2バイトを読み飛ばします。主人公が違うブロックでは <code>1E 0B</code> と <code>00 FF</code> が両方飛ばされ、次のブロックへ進みます。主人公が合うブロックでは、<code>1E 0B</code> を実行し、<code>00 FF</code> で終わります。ホークの場合、先頭から4番目のブロックの <code>00</code>（$1A:FF7E）まで、54バイトを同じフレームのうちに読み進みます。$1701 は音を鳴らす処理に渡す番号の置き場所です。条件が主人公の判定であることと、<code>1E 0B</code> が曲を切り替える処理であることは、並びからの推定です。</figcaption>
   </figure>
   <p>ここから先は「台本の切り替え」という命令が何度も出てきます。バグの動きを左右する命令なので、先に説明します。</p>
