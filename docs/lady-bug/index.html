@@ -104,6 +104,18 @@ tr.pick{cursor:pointer} tr.pick.sel td{background:var(--win)}
 .gallery figcaption{font-size:13px;line-height:1.6;color:var(--muted)}
 .gallery figcaption b{color:var(--ink);font-weight:700}
 ul.plain{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px;max-width:38em}
+/* quiz */
+.quiz{display:flex;flex-direction:column;gap:12px;margin:0;padding:0;counter-reset:q}
+.quiz li{list-style:none;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;counter-increment:q}
+.quiz .st{font-size:15.5px;line-height:1.75}
+.quiz .st::before{content:"Q" counter(q) " ";font-family:var(--f-display);color:var(--accent);margin-right:4px}
+.quiz .ox button{min-width:64px;font-size:18px;line-height:1.2;padding:6px 0}
+.quiz .ox button[aria-pressed="true"]{background:var(--accent);color:var(--bg)}
+.quiz .ans{font-size:14px;line-height:1.75;border-left:3px solid var(--line);padding-left:12px}
+.quiz .ans b.v{font-family:var(--f-display);font-size:17px;margin-right:6px}
+.quiz li.ok .ans{border-color:var(--ok)} .quiz li.ok .ans b.v{color:var(--ok)}
+.quiz li.ng .ans{border-color:var(--hot)} .quiz li.ng .ans b.v{color:var(--hot)}
+.score{font-family:var(--f-mono);font-size:14px;color:var(--muted)}
 footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
 </style>
 
@@ -460,6 +472,14 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   </div>
 </section>
 
+<section>
+  <div class="eyebrow">11 ／ 確認</div>
+  <h2>理解度チェック：まちがえやすい10問</h2>
+  <p>文が正しければ○、まちがっていれば×を選んでください。選ぶと、答えと理由が出ます。</p>
+  <ol class="quiz" id="quiz"></ol>
+  <div class="btns"><span class="score" id="qScore" aria-live="polite">0 / 10 問に回答</span><button id="qReset">やり直す</button></div>
+</section>
+
 <footer>アドレスは日本版ROMのもの、フレーム番号はTAS入力ファイル（7,279F版）の行番号です。イベント処理が読んだバイトを1つずつ記録する方法と、プログラムの逆アセンブルで確かめました。詳しい根拠は文書「レイディバグの仕組み」にあります。</footer>
 </main>
 
@@ -593,6 +613,35 @@ const STEPS=[
     const pick=()=>{ tb.querySelectorAll('tr').forEach(r=>r.classList.remove('sel')); tr.classList.add('sel'); cur.setAttribute('x1',X(st[0])); cur.setAttribute('x2',X(st[0])); cur.setAttribute('visibility','visible') };
     tr.onclick=pick; tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick()}}; tb.appendChild(tr); });
 })();
+})();
+(function(){
+const Q=[
+["プレイ時間カウンタのとりうる値は0から3600であるから、最初のレイディバグ発火では3600通りに分岐する可能性がある。",false,"発火の瞬間にカウンタは台本のアドレスで上書きされ、最初の待ちは必ず 0x1AB8（6,840）から始まります。0になるまでの約1分54秒のあいだに読める場所は、バンク$00〜$1Bの各128区画で約3,580通りです。3600は、0になったあとに戻る値です。"],
+["プレイ時間カウンタの値が 0x1A34 の場合と 0x1BB4 の場合は、どちらも $1B:B4xx を読む。",true,"下位バイトが0x80未満のときは「上位＋1、下位＋0x80」に直されます。0x1A34 は $1B:B4xx に直されるので、0x1BB4 と同じ場所になります。"],
+["発火するときのカウンタの値は、それまでのプレイ時間によって変わる。",false,"11枚目のメモがカウンタの上に書かれるので、それまでの値は消えます。発火後の読む場所は、発火してから何フレーム目に押すかだけで決まります。"],
+["港での追い返しが9回以下では、このバグは起きない。",true,"メモは追い返し1回につき1枚たまります。時計と重なるのは11枚目なので、10回目の追い返しで初めて起きます。"],
+["発火後の最初の誤動作は、プレイヤーがボタンを押した瞬間に起きる。",false,"ボタンを押す前に、自動で1歩進みます。11枚目のメモが書かれた2フレーム後に、別の台本（0x8F）へ切り替わり、そこで最初のボタン待ちに入ります。"],
+["ボタン待ちで止まっているあいだ、次に読む場所は毎フレーム256バイトずつ手前へ移る。",true,"カウンタは毎フレーム1ずつ減り、その下位バイトが読む場所の上位バイトになっているためです。区画の中での位置（下位バイト）は変わりません。"],
+["ボタン待ちでは、AボタンとXボタンのどちらを押すかで、読む場所が変わる。",false,"ボタン待ちでは、どのボタンでも同じ場所を読みます。Xが効くのは別の場面で、ウィンドウが開く途中の決まったフレームにXを押していると、開く時間が6フレームから5フレームに縮みます。"],
+["バグ中は、主人公の名前や所持品などRAMの内容を、命令として読ませることができる。",false,"読む場所は必ずROMの中に補正されます。上位バイトが0x80未満なら、次のバンクの上半分へ送られるためです。"],
+["エンディングを始める命令 40 70 は、ROMの中に1か所しかない。",false,"8か所あります。TASが使っているのはそのうちの $1B:B476 で、本物のエンディング台本（0x277）の最後の2バイトです。"],
+["画面が暗転したまま動かなくなった場合、もう復帰する方法はない。",false,"Aボタンを押し続けると、200通りのうち91通りで操作できる状態に戻りました。ボタンを混ぜると108通りまで増えます。"]
+];
+const ol=document.getElementById('quiz'), sc=document.getElementById('qScore'); let done=0, right=0;
+function build(){ ol.textContent=''; done=0; right=0; sc.textContent='0 / '+Q.length+' 問に回答';
+  Q.forEach(q=>{ const li=document.createElement('li');
+    const st=document.createElement('div'); st.className='st'; st.textContent=q[0];
+    const ox=document.createElement('div'); ox.className='btns ox';
+    const ans=document.createElement('div'); ans.className='ans'; ans.hidden=true;
+    [['○',true],['×',false]].forEach(o=>{ const b=document.createElement('button'); b.textContent=o[0]; b.setAttribute('aria-label',o[1]?'正しい':'まちがい'); b.setAttribute('aria-pressed','false');
+      b.onclick=()=>{ if(!ans.hidden) return; b.setAttribute('aria-pressed','true'); ox.querySelectorAll('button').forEach(x=>x.disabled=true);
+        const ok=o[1]===q[1]; li.classList.add(ok?'ok':'ng'); done++; if(ok) right++;
+        const v=document.createElement('b'); v.className='v'; v.textContent=(ok?'正解':'不正解')+'（答えは'+(q[1]?'○':'×')+'）';
+        ans.appendChild(v); ans.appendChild(document.createTextNode(q[2])); ans.hidden=false;
+        sc.textContent=done+' / '+Q.length+' 問に回答、'+right+' 問正解'; };
+      ox.appendChild(b); });
+    li.appendChild(st); li.appendChild(ox); li.appendChild(ans); ol.appendChild(li); }); }
+document.getElementById('qReset').onclick=build; build();
 })();
 </script>
 
