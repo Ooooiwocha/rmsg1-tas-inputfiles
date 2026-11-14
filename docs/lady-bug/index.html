@@ -323,16 +323,32 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   </figure>
   <figure class="fig">
     <h3>エンディングを呼ぶ条件</h3>
-    <p class="small">エンディング開始の命令 <code>40 70</code> がある場所に、読む場所を合わせれば始まります。読む場所は直接指定できないので、次の3つをそろえる必要があります。</p>
+    <p class="small">エンディング開始の命令 <code>40 70</code> がある場所に、読む場所を合わせれば始まります。読む場所は直接指定できないので、「決まった下位バイトのボタン待ちに止まる」ことが本質的な条件です。止まれさえすれば、あとは待つフレーム数で合わせられます。</p>
     <div class="scroll"><table>
       <thead><tr><th>条件</th><th>$1B:B476 を狙う場合</th><th>TASでの満たし方</th></tr></thead>
       <tbody>
-        <tr><td>1. バンク</td><td>バンク$1Bを読む状態になっている</td><td>台本を3回切り替え、バンク$1Bにある台本0x2A2に入る</td></tr>
-        <tr><td>2. 下位バイト</td><td>下位バイトが75の位置にあるボタン待ちで止まる（押すと次の76から読む）</td><td>$1B:C275 のボタン待ちに止まる</td></tr>
-        <tr><td>3. 上位バイト</td><td>上位バイトがB4になるフレームで押す</td><td>C2からB4まで減るのを14フレーム待ってAを押す</td></tr>
+        <tr><td>1. 下位バイト<br><span class="muted small">（これが難関）</span></td><td>下位バイトが75の位置にあるボタン待ちで止まる（押すと次の76から読む）</td><td>台本を3回切り替えて、$1B:C275 のボタン待ちに止まる</td></tr>
+        <tr><td>2. 押すフレーム</td><td>読む場所が $1B:B4xx になるフレームで押す。バンク$1Bで上位がB4より大きければ、B4まで減るのを待つ。そうでなくても、待ち続ければバンクを行きつ戻りつするので、カウンタが0x1A34になるときに同じ場所を通る</td><td>C2からB4まで減るのを14フレーム待ってAを押す</td></tr>
+        
       </tbody>
     </table></div>
-    <figcaption><code>40 70</code> というバイト列は台本の領域に8か所あります（$1A:E3F8、$1B:AE33、AF88、B0B3、B1BE、B280、B3C2、B476）。どれに合わせても同じ命令が実行されます。少し手前に入っても、間の命令を読み進んで <code>40 70</code> に届く場合がありますが、途中でフレームを使う命令があると読む場所がまたずれるので、場所ごとに確かめる必要があります。B476以外の7か所へ実際に入れるかは、試していません。</figcaption>
+    <figcaption><code>40 70</code> というバイト列は台本の領域に8か所あります（$1A:E3F8、$1B:AE33、AF88、B0B3、B1BE、B280、B3C2、B476）。どれに合わせても同じ命令が実行されます。少し手前に入っても、間の命令を読み進んで <code>40 70</code> に届く場合がありますが、途中でフレームを使う命令があると読む場所がまたずれるので、場所ごとに確かめる必要があります。</figcaption>
+    <h3>止まればよいボタン待ちの候補</h3>
+    <p class="small">台本のある3つのバンクで、必要な下位バイトの位置に <code>12</code>（ボタン待ち）がある場所を数えました。B476を狙う場合の候補は5か所です（$1A:8775、$1A:CF75、$1B:8175、$1B:8C75、$1B:C275）。TASが使ったのは最後の1つです。</p>
+    <div class="scroll"><table>
+      <thead><tr><th>狙う <code>40 70</code> の場所</th><th>必要な下位バイト</th><th>候補（$1A）</th><th>候補（$1B）</th><th>候補（$1C）</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">$1B:AE33</td><td class="mono">32</td><td class="n">4</td><td class="n">2</td><td class="n">1</td></tr>
+        <tr><td class="mono">$1B:AF88</td><td class="mono">87</td><td class="n">4</td><td class="n">0</td><td class="n">3</td></tr>
+        <tr><td class="mono">$1B:B0B3</td><td class="mono">B2</td><td class="n">2</td><td class="n">0</td><td class="n">0</td></tr>
+        <tr><td class="mono">$1B:B1BE</td><td class="mono">BD</td><td class="n">5</td><td class="n">1</td><td class="n">0</td></tr>
+        <tr><td class="mono">$1B:B280</td><td class="mono">7F</td><td class="n">2</td><td class="n">5</td><td class="n">1</td></tr>
+        <tr><td class="mono">$1B:B3C2</td><td class="mono">C1</td><td class="n">1</td><td class="n">0</td><td class="n">0</td></tr>
+        <tr><td class="mono">$1B:B476</td><td class="mono">75</td><td class="n">2</td><td class="n">3</td><td class="n">0</td></tr>
+        <tr><td class="mono">$1A:E3F8</td><td class="mono">F7</td><td class="n">3</td><td class="n">1</td><td class="n">0</td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>合計で40か所です。ただし、値が <code>12</code> でも別の命令の引数や台本でないデータの場合があり、そこに命令の先頭として行き着く道筋があるかも場所ごとに探す必要があります。実際に試したのは $1B:C275 から $1B:B476 へ入る経路だけで、「待ち続ければ同じ場所を通る」という点も仕組みからの計算です。</figcaption>
   </figure>
   <h3>概略版</h3>
   <div class="scroll"><table id="tasTable">
