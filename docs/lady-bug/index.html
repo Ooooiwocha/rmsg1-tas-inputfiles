@@ -266,6 +266,38 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     </table></div>
     <figcaption>1〜9回目は6番目の命令でメモが1枚ずつ残り、10回目は4番目の命令で12枚目に達します。10回目の追い返しでは、セリフのあと世界地図が出る前に、もうバグが始まっています。</figcaption>
   </figure>
+  <p>ここから先は「台本の切り替え」という命令が何度も出てきます。バグの動きを左右する命令なので、先に説明します。</p>
+  <figure class="fig">
+    <h3>台本の切り替えとは</h3>
+    <p class="small">いま読んでいる台本をやめて、別の台本の先頭から読み始める命令です。2バイトでできています。</p>
+    <div class="bytes">
+      <span class="by cmd"><i>00〜03</i><small>1バイト目</small></span>
+      <span class="by"><i>00〜FF</i><small>2バイト目</small></span>
+      <span class="by txt"><i>台本番号 ＝ 1バイト目 × 256 ＋ 2バイト目</i><small>0x000〜0x3FF の1,024通り</small></span>
+    </div>
+    <ul class="plain small">
+      <li><b>呼び出し（<code>1B</code>）との違い</b>　呼び出しはメモを1枚積み、呼んだ台本が終わると元の続きに戻ります。切り替えはメモを積まず、いまのメモの中身を書き換えるだけなので、元の台本には戻りません。プログラムでいえば、呼び出しが関数呼び出し、切り替えがジャンプ（goto）にあたります。</li>
+      <li><b>書き換わるもの</b>　いまのメモの「読む場所」3バイト（下位・上位・バンク）と「終了位置」2バイトです。新しい値は、ROMの $1C:A620 から並んでいる台本の一覧表を、台本番号で引いて決まります。</li>
+      <li><b>かかる時間</b>　1バイト目を読んだあと、画面の更新を待つために2フレームかかり、そのあとで2バイト目を読みます。</li>
+      <li><b>本来の使われ方</b>　港に入ったときのイベントは <code>02 E8</code> で追い返しの台本0x2E8に移ります。台本の最後に <code>00 FF</code> と書いて、中身が「終了」だけの台本0xFFに移って終わる、という使い方もあります。</li>
+    </ul>
+    <div class="scroll"><table>
+      <thead><tr><th>命令</th><th>台本番号</th><th>一覧表の値</th><th>読み始めるアドレス</th><th>出てくる場面</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">00 FF</td><td class="mono">0x0FF</td><td class="mono">604E</td><td class="mono">$1A:E04E</td><td>台本0x194の最後（本来の動き）</td></tr>
+        <tr><td class="mono">00 8F</td><td class="mono">0x08F</td><td class="mono">390A</td><td class="mono">$1A:B90A</td><td>バグで最初に起きる切り替え（この章）</td></tr>
+        <tr><td class="mono">00 8B</td><td class="mono">0x08B</td><td class="mono">3819</td><td class="mono">$1A:B819</td><td>TASの1回目（7章）</td></tr>
+        <tr><td class="mono">00 A2</td><td class="mono">0x0A2</td><td class="mono">4098</td><td class="mono">$1A:C098</td><td>TASの2回目（7章）</td></tr>
+        <tr><td class="mono">02 A2</td><td class="mono">0x2A2</td><td class="mono">C669</td><td class="mono">$1B:C669</td><td>TASの3回目（7章）</td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>一覧表の値が8000未満ならバンク$1Aで、アドレスは値に8000を足したもの。8000以上ならバンク$1Bで、アドレスは値そのままです。台本番号が0x36A以上のものはバンク$1Cにあります。</figcaption>
+    <h3>バグ中に切り替えが特別な働きをする理由</h3>
+    <ul class="plain small">
+      <li><b>2バイト目が別の値に化ける</b>　1バイト目と2バイト目の間に2フレームたつので、12枚目のメモでは読む場所が512バイト手前にずれます。2バイト目は、台本に書かれた値ではなく、ずれた先にたまたまあった値になります。行き先の台本番号が、押すタイミングで変わるということです。</li>
+      <li><b>読む場所が大きく飛ぶ</b>　ふだんのずれは1フレームに256バイトずつ手前へ下がるだけです。切り替えが起きると、読む場所が切り替え先の台本の先頭アドレスに入れ直されるので、離れた場所へ一気に移れます。12枚目のメモの読む場所は時計と同じ場所にあるので、このとき時計の値も一緒に書き換わります。</li>
+    </ul>
+  </figure>
   <p>12枚目として呼ばれた台本0x194は、最後に「台本0xFFへ切り替える」命令 <code>00 FF</code> で終わります。台本0xFFは中身が「終了」だけの空の台本で、本来はここで11枚目に戻るはずでした。</p>
   <figure class="fig">
     <div class="scroll">
