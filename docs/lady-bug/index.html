@@ -422,49 +422,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
 </section>
 
 <section>
-  <div class="eyebrow">8 ／ できること</div>
-  <h2>押すタイミングを変えると、何が起きるか</h2>
-  <p>最初の待ちから押すフレームを200通りに変えて、実行された命令を記録しました。どれも、ROMにもとからある台本を途中から実行した結果です。</p>
-  <div class="gallery">
-    <figure><img class="shot" src="img/battle.png" alt="骸骨の敵との戦闘画面"><figcaption><b>戦闘が始まる</b>　命令 <code>0E 01</code>。2バイト目が敵の種別です。</figcaption></figure>
-    <figure><img class="shot" src="img/warp.png" alt="建物の中のマップ"><figcaption><b>別のマップへ移る</b>　命令 <code>06 01</code> など。建物の中に出ました。</figcaption></figure>
-    <figure><img class="shot" src="img/worldmap2.png" alt="別の地域の世界地図"><figcaption><b>別の地域の世界地図</b>　命令 <code>08 46</code> など。</figcaption></figure>
-    <figure><img class="shot" src="img/boss.png" alt="最終ボスと思われる敵との戦闘画面"><figcaption><b>最終ボスと思われる戦闘</b>　A連打の途中で出た画面です。</figcaption></figure>
-    <figure><img class="shot" src="img/name.png" alt="名前入力の画面"><figcaption><b>名前入力の画面</b>　これもA連打の途中で出ました。</figcaption></figure>
-    <figure><img class="shot" src="img/shop.png" alt="店の中に船の姿の主人公がいる"><figcaption><b>船のまま店の中へ</b>　復帰後、主人公が船の姿のままでした。</figcaption></figure>
-  </div>
-  <p class="small muted">このほか、フラグの変更（200通り中49）や、戦闘回数・現在のマップ番号への書き込みも起きていました。リバイアサンと戦闘になる <code>0E F0</code> の経路があるかは、探していません。</p>
-</section>
-
-<section>
-  <div class="eyebrow">9 ／ 復帰</div>
-  <h2>ボタンを押し続ければ、半分ほどは操作できる状態に戻る</h2>
-  <p>発火後にAを連打し続けると、台本を次々に読み進めた末に、入れ子が全部片づいて主人公を動かせる状態に戻ることがあります。200通りの押し始めのタイミングで試しました。</p>
-  <div class="row">
-    <figure class="fig"><img class="shot" src="img/recover.gif" alt="暗転した画面でAを連打すると港の画面に戻り、船を動かせるようになる様子"><figcaption>暗転のままAを連打 → 港に戻り、船を動かせる（早回し）。</figcaption></figure>
-    <figure class="fig">
-      <h3>操作できる状態に戻った数（200通り中）</h3>
-      <div class="bars">
-        <div class="bar"><div class="lab">Aを毎秒10回、40秒間</div><div class="track"><div class="fill" style="width:45.5%"></div></div><div class="mono">91</div></div>
-        <div class="bar"><div class="lab">さらにAを約2分</div><div class="track"><div class="fill" style="width:48%"></div></div><div class="mono">96</div></div>
-        <div class="bar"><div class="lab">さらにB・Y・Start・十字も混ぜて約1分</div><div class="track"><div class="fill" style="width:54%"></div></div><div class="mono">108</div></div>
-      </div>
-      <h3>最終的な内訳</h3>
-      <div class="stackbar" role="img" aria-label="復帰108、戦闘などで止まる45、12〜13枚目で止まる33、11枚目で止まる14">
-        <div style="width:54%;background:var(--accent)"></div><div style="width:22.5%;background:var(--hot)"></div><div style="width:16.5%;background:var(--bank2)"></div><div style="width:7%;background:var(--count)"></div>
-      </div>
-      <div class="legend"><span style="--c:var(--accent)">復帰 108</span><span style="--c:var(--hot)">入れ子は片づいたが操作不能 45（うち戦闘のまま約34）</span><span style="--c:var(--bank2)">12〜13枚目で停止 33</span><span style="--c:var(--count)">11枚目で停止 14</span></div>
-    </figure>
-  </div>
-  <ul class="plain small">
-    <li>戻るまでの時間は2〜30秒で、15秒前後が最も多くなりました。</li>
-    <li>連打の速さを毎秒30回・10回・5回に変えても、戻る割合はほぼ同じでした。ただし、どのタイミングで戻れるかは入れ替わります。</li>
-    <li>戻ったあとはバグの前と同じ状態ではありません。途中の命令でフラグやマップが変わっています。メニューやセーブ、その先の進行は確かめていません。</li>
-  </ul>
-</section>
-
-<section>
-  <div class="eyebrow">10 ／ 限界</div>
+  <div class="eyebrow">8 ／ 限界</div>
   <h2>できないことと、まだ分かっていないこと</h2>
   <div class="row">
     <div><h3>できないこと</h3><ul class="plain small">
@@ -481,14 +439,14 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
 </section>
 
 <section>
-  <div class="eyebrow">11 ／ 確認</div>
+  <div class="eyebrow">9 ／ 確認</div>
   <h2>理解度チェック：まちがえやすい10問</h2>
   <p>文が正しければ○、まちがっていれば×を選んでください。選ぶと、答えと理由が出ます。</p>
   <ol class="quiz" id="quiz"></ol>
   <div class="btns"><span class="score" id="qScore" aria-live="polite">0 / 10 問に回答</span><button id="qReset">やり直す</button></div>
 </section>
 
-<footer>アドレスは日本版ROMのもの、フレーム番号はTAS入力ファイル（7,279F版）の行番号です。イベント処理が読んだバイトを1つずつ記録する方法と、プログラムの逆アセンブルで確かめました。詳しい根拠は文書「レイディバグの仕組み」にあります。</footer>
+<footer>アドレスは日本版ROMのもの、フレーム番号はTAS入力ファイル（7,279F版）の行番号です。イベント処理が読んだバイトを1つずつ記録する方法と、プログラムの逆アセンブルで確かめました。</footer>
 </main>
 
 <script>
