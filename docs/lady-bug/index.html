@@ -163,6 +163,20 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <figcaption>一部の命令は省略しています。最後の2つが、この後の話の主役です。メモリやROMの中の位置を表す番号を「アドレス」または「番地」といいます。台本の番号、番地、バイトの値はすべて16進数で、番号には 0x を付けています（0x173 は10進数の371）。</figcaption>
     </figure>
   </div>
+  <figure class="fig">
+    <h3>台本を実行しているのは、CPUではなくゲームのプログラム</h3>
+    <p class="small">台本の命令は、開発者がこのゲームのために決めた独自のものです。スーパーファミコンのCPUは台本の命令を知らず、台本はCPUから見ればただのデータです。ゲームのプログラムの中に「台本を1バイト読み、その値に応じた処理へ進む」という繰り返しがあり、それが台本を解釈しています。（このような仕組みを「インタープリター」、解釈される命令の列を「バイトコード」といいます。）</p>
+    <div class="scroll"><table>
+      <thead><tr><th>バイトの値</th><th>扱い</th><th>例</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">00〜03</td><td>台本の切り替え（5章で説明）</td><td class="mono">02 E8</td></tr>
+        <tr><td class="mono">04〜0F</td><td>マップ移動や戦闘など、フィールド側の処理を呼ぶ</td><td class="mono">08 3F</td></tr>
+        <tr><td class="mono">10〜4B</td><td>命令。種類ごとに、続けて読む引数の数が決まっている</td><td><span class="mono">12</span>（ボタン待ち、1バイト）、<span class="mono">1B 01 73</span>（台本を呼ぶ、3バイト）、<span class="mono">47 18 D8 FF</span>（メモリに書く、4バイト）</td></tr>
+        <tr><td class="mono">4C〜FF</td><td>文字。1バイトで1文字（漢字は <span class="mono">3F</span> を前に付けて2バイト）</td><td><span class="mono">93</span>（こ）、<span class="mono">A3</span>（は）</td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>命令の長さは1バイトから9バイトまであります。レイディバグで狂うのは「どこを台本として読むか」だけで、CPUも、台本を解釈するプログラムも、最後まで正常に動いています。</figcaption>
+  </figure>
 </section>
 
 <section>
