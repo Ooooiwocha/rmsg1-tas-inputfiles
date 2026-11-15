@@ -132,6 +132,7 @@ details.aside p,details.aside ul{max-width:none}
 table.path td.rd{background:var(--win)}
 table.path td.sk{text-decoration:line-through;color:var(--muted)}
 table.path td.un{opacity:.45}
+table.path .late{color:var(--hot);font-weight:600;outline:1.5px solid var(--hot);outline-offset:1px;border-radius:2px;padding:0 2px}
 .score{font-family:var(--f-mono);font-size:14px;color:var(--muted)}
 footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
 </style>
@@ -320,15 +321,15 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
         <tr><td class="n">1</td><td class="mono">$1A:FF48〜</td><td class="mono rd">47 17 01 1F</td><td class="mono rd">28 40 0E</td><td class="mono sk">1E 0B</td><td class="mono rd">28 40 0E</td><td class="mono sk">00 FF</td></tr>
         <tr><td class="n">2</td><td class="mono">$1A:FF56〜</td><td class="mono rd">47 17 01 17</td><td class="mono rd">28 41 0E</td><td class="mono sk">1E 0B</td><td class="mono rd">28 41 0E</td><td class="mono sk">00 FF</td></tr>
         <tr><td class="n">3</td><td class="mono">$1A:FF64〜</td><td class="mono rd">47 17 01 10</td><td class="mono rd">28 42 0E</td><td class="mono sk">1E 0B</td><td class="mono rd">28 42 0E</td><td class="mono sk">00 FF</td></tr>
-        <tr><td class="n">4<br><b style="font-family:var(--f-body);font-size:12px">ホーク</b></td><td class="mono">$1A:FF72〜</td><td class="mono rd">47 17 01 09</td><td class="mono rd">28 43 0E</td><td class="mono rd">1E 0B</td><td class="mono rd">28 43 0E</td><td class="mono rd">00 FF</td></tr>
+        <tr><td class="n">4<br><b style="font-family:var(--f-body);font-size:12px">ホーク</b></td><td class="mono">$1A:FF72〜</td><td class="mono rd">47 17 01 09</td><td class="mono rd">28 43 0E</td><td class="mono rd">1E 0B</td><td class="mono rd">28 43 0E</td><td class="mono rd">00 <span class="late">FF</span></td></tr>
         <tr><td class="n">5</td><td class="mono un">$1A:FF80〜</td><td class="mono un">47 17 01 01</td><td class="mono un">28 44 0E</td><td class="mono un">1E 0B</td><td class="mono un">28 44 0E</td><td class="mono un">00 FF</td></tr>
         <tr><td class="n">6</td><td class="mono un">$1A:FF8E〜</td><td class="mono un">47 17 01 07</td><td class="mono un">28 45 0E</td><td class="mono un">1E 0B</td><td class="mono un">28 45 0E</td><td class="mono un">00 FF</td></tr>
         <tr><td class="n">7</td><td class="mono un">$1A:FF9C〜</td><td class="mono un">47 17 01 0B</td><td class="mono un">28 46 0E</td><td class="mono un">1E 0B</td><td class="mono un">28 46 0E</td><td class="mono un">00 FF</td></tr>
         <tr><td class="n">8</td><td class="mono un">$1A:FFAA〜</td><td class="mono un">47 17 01 14</td><td class="un">なし</td><td class="mono un">1E 0B</td><td class="un">なし</td><td class="un">なし</td></tr>
       </tbody>
     </table></div>
-    <div class="legend"><span style="--c:var(--win)">ホークが主人公のときに読まれる命令</span><span style="--c:transparent;text-decoration:line-through">読み飛ばされる命令</span><span style="--c:transparent;opacity:.45">そこまで進まない命令</span></div>
-    <p class="small">左から右へ、台本に書かれている順番どおりに並べています。色の付いたところを左上から順にたどると、ホークが主人公のときに実際に読まれる道筋になります。1〜3番目のブロックでは、変数（0x40〜0x42）がFではないので、<span class="mono">1E 0B</span> と <span class="mono">00 FF</span> は読み飛ばされます。4番目のブロックでは変数0x43がFなので、5つの命令がすべて読まれ、<span class="mono">00 FF</span> で終わります。5番目以降には進みません。主人公が違えば、色の付く範囲が変わります。8番目のブロックには条件判定がなく、<span class="mono">1E 0B</span> を必ず読んで、そこで台本の終わりに達します。</p>
+    <div class="legend"><span style="--c:var(--win)">ホークが主人公のときに読まれる命令</span><span style="--c:var(--hot)">2フレーム後に読まれるバイト</span><span style="--c:transparent;text-decoration:line-through">読み飛ばされる命令</span><span style="--c:transparent;opacity:.45">そこまで進まない命令</span></div>
+    <p class="small">左から右へ、台本に書かれている順番どおりに並べています。色の付いたところを左上から順にたどると、ホークが主人公のときに実際に読まれる道筋になります。1〜3番目のブロックでは、変数（0x40〜0x42）がFではないので、<span class="mono">1E 0B</span> と <span class="mono">00 FF</span> は読み飛ばされます。4番目のブロックでは変数0x43がFなので、5つの命令がすべて読まれ、<span class="mono">00 FF</span> で終わります。<b>色の付いた部分は、最後の1バイトを除いて、同じフレームのうちに一気に読まれます。赤で囲んだ最後の <span class="mono">FF</span> だけは、<span class="mono">00</span> を読んだ2フレーム後に読まれます。</b>レイディバグでは、この2フレームの間に読む場所がずれます。5番目以降には進みません。主人公が違えば、色の付く範囲が変わります。8番目のブロックには条件判定がなく、<span class="mono">1E 0B</span> を必ず読んで、そこで台本の終わりに達します。</p>
     <h3>4番目のブロックのアドレス</h3>
     <div class="bytes">
       <span class="by cmd"><i>47 17 01 09</i><small>$1A:FF72〜FF75</small></span>
