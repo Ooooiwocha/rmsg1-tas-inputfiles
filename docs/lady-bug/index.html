@@ -266,6 +266,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <div><small>点Pの読み始める場所</small><b id="sA" style="color:var(--hot)">$1A:B618</b></div>
     </div>
     <div class="scroll"><svg id="saw" viewBox="0 0 720 250" width="720" role="img" aria-label="押すフレームと読み始める場所の関係。128フレームごとにバンクが切り替わるのこぎり形"></svg></div>
+    <div class="legend"><span style="--c:var(--accent)">補正なし（カウンタの上位バイトがそのままバンクになる）</span><span style="--c:var(--bank2)">補正あり（バンク＋1、上位＋80）</span></div>
     <div class="btns">
       <button class="primary" id="sawPlay">止める</button>
       <input type="range" id="sawRange" min="2" max="899" value="2" aria-label="押すフレーム" style="flex:1 1 200px;min-width:0;accent-color:var(--accent)">
@@ -647,7 +648,7 @@ drawTape();
   el('text',{x:4,y:10,'font-size':11.5,fill:'var(--muted)',style:'font-family:var(--f-body)'},s,'読み始める番地（バンク内）');
   let k=2;
   while(k<K){ const a=addr(k); let e=k; while(e+1<K && addr(e+1).bank===a.bank && addr(e+1).hi===addr(e).hi-1) e++;
-    const b=addr(e); const c=(a.bank%2===0)?'var(--accent)':'var(--bank2)';
+    const b=addr(e); const c=(((0x1AB8-k)&0xFF)<0x80)?'var(--bank2)':'var(--accent)';
     el('line',{x1:X(k),y1:Y(a.hi*256+0x18),x2:X(e),y2:Y(b.hi*256+0x18),stroke:c,'stroke-width':2.5,'stroke-linecap':'round'},s);
     el('text',{x:(X(k)+X(e))/2+10,y:Y((a.hi+b.hi)/2*256)-8,'font-size':12,'text-anchor':'middle',fill:c},s,'$'+hex(a.bank,2));
     k=e+1; }
