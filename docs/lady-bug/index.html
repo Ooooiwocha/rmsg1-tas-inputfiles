@@ -152,9 +152,8 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   <h2>イベントは「台本」を1バイトずつ読んで進む</h2>
   <p>セリフも、マップ移動も、戦闘の開始も、ROMに書かれた「台本」というバイト列で指示されています。（このように、処理の手順を書いたデータを一般に「スクリプト」といいます。このページでは台本と呼びます。）ゲームは台本を先頭から1バイトずつ読み、文字なら表示し、命令なら実行します。</p>
   <div class="row">
-    <figure class="fig"><img class="shot" src="img/reject.gif" alt="港に入ると「海賊だ！おいはらえ！」と言われ、世界地図に戻される様子"><figcaption>追い返し1回ぶん（約3秒）。港に入る → 追い返される → 世界地図へ。</figcaption></figure>
     <figure class="fig">
-      <h3>このとき読まれている台本（番号0x2E8）</h3>
+      <h3>港で追い返されるときに読まれる台本（番号0x2E8）</h3>
       <div class="bytes">
         <span class="by cmd"><i>08 3F</i><small>港のマップへ</small></span>
         <span class="by txt"><i>ここは だめだ！</i><small>文字</small></span>
@@ -527,7 +526,6 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     </table></div>
     <figcaption>この間、画面はずっと真っ暗です。「」の中は、読まれたバイトを文字コード表で読み替えたものです。セリフの途中から読んでいるので、断片になっています。「記号」は文字コードF7・F9、「漢字」は3Fで始まる2バイトの文字で、どの字かは特定できていません。「名前の表示」は人物名などを差し込む命令です。灰色の行は「何も読まずに時計だけが進む」フレームで、そのフレーム数だけ次に読む場所が256バイトずつ手前へずれます。台本の切り替えでは、読む場所が切り替え先の台本の先頭に入れ直されます。</figcaption>
   </figure>
-  <figure class="fig"><img class="shot" src="img/ending.png" alt="エンディングの一場面"><figcaption>最後のAから少し後のエンディングの画面。</figcaption></figure>
 </section>
 
 <section>
