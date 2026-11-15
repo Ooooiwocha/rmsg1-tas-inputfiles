@@ -374,7 +374,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <li><b>本来の使われ方</b>　港に入ったときのイベントは <code>02 E8</code> で追い返しの台本0x2E8に移ります。台本の最後に <code>00 FF</code> と書いて、中身が「終了」だけの台本0xFFに移って終わる、という使い方もあります。</li>
     </ul>
     <div class="scroll"><table>
-      <thead><tr><th>命令</th><th>台本番号</th><th>一覧表の値</th><th>読み始めるアドレス</th><th>出てくる場面</th></tr></thead>
+      <thead><tr><th>命令</th><th>台本番号</th><th>台本の一覧表（$1C:A620〜）に書かれた値</th><th>読み始めるアドレス</th><th>出てくる場面</th></tr></thead>
       <tbody>
         <tr><td class="mono">00 FF</td><td class="mono">0x0FF</td><td class="mono">604E</td><td class="mono">$1A:E04E</td><td>台本0x194の最後（本来の動き）</td></tr>
         <tr><td class="mono">00 8F</td><td class="mono">0x08F</td><td class="mono">390A</td><td class="mono">$1A:B90A</td><td>バグで最初に起きる切り替え（この章）</td></tr>
@@ -383,7 +383,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
         <tr><td class="mono">02 A2</td><td class="mono">0x2A2</td><td class="mono">C669</td><td class="mono">$1B:C669</td><td>TASの3回目（7章）</td></tr>
       </tbody>
     </table></div>
-    <figcaption>一覧表の値が8000未満ならバンク$1Aで、アドレスは値に8000を足したもの。8000以上ならバンク$1Bで、アドレスは値そのままです。台本番号が0x36A以上のものはバンク$1Cにあります。</figcaption>
+    <figcaption>「台本の一覧表」は、ROMの $1C:A620 から並んでいる、台本ごとの先頭アドレスの表です。1つの台本につき2バイトで、台本番号nの値は $1C:A620＋n×2 にあります（例：台本0x8Fなら $1C:A73E）。台本の終わりは、次の番号の値で決まります。値が8000未満ならバンク$1Aで、アドレスは値に8000を足したもの。8000以上ならバンク$1Bで、アドレスは値そのままです。台本番号が0x36A以上のものはバンク$1Cにあります。</figcaption>
     <h3>バグ中に切り替えが特別な働きをする理由</h3>
     <ul class="plain small">
       <li><b>2バイト目が別の値に化ける</b>　1バイト目と2バイト目の間に2フレームたつので、12枚目のメモでは読む場所が512バイト手前にずれます。2バイト目は、台本に書かれた値ではなく、ずれた先にたまたまあった値になります。行き先の台本番号が、押すタイミングで変わるということです。</li>
