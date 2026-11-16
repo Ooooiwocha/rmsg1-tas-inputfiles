@@ -35,9 +35,18 @@ end
 local last = nil      -- ゲームが最後に $2100 へ書いた値（分からないときは nil）
 local mine = false    -- 自分の書き込み中は見張りを無視する
 
-event.on_bus_write(function(addr, val, flags)
+local function watch(addr, val, flags)
   if not mine and val ~= nil then last = val end
-end, 0x2100, "keep-bright-watch", BUS)
+end
+
+-- $2100 はバンク $00〜$3F と $80〜$BF のどこからでも同じレジスタに届く。
+-- ゲームはバンク $00 以外からも書くので、全部のバンクを見張る
+-- （バンク $00 だけを見張ると「表示オフ」を見逃して画面が壊れる）。
+for bank = 0, 0xFF do
+  if bank % 0x80 < 0x40 then
+    event.on_bus_write(watch, bank * 0x10000 + 0x2100, "keep-bright-watch-" .. bank, BUS)
+  end
+end
 
 event.onloadstate(function() last = nil end, "keep-bright-load")
 
