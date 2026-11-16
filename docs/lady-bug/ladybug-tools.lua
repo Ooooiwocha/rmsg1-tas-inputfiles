@@ -6,6 +6,13 @@
 --   2行目：12枚目のメモの中身（時計と重なっていて毎フレーム変わる）
 --   3行目：IDLE 最後にスクリプトの命令を読んでからのフレーム数（開始直後・ステート読み込み直後は ?）
 --   12枚目以上を読んでいる間は赤、それ以外は白で表示する。
+-- さらに、メモの動きをファイルに記録する（USE_LOG）。
+--   毎フレームは書かず、次のときだけ1行書く：
+--     ・メモの枚数が変わった
+--     ・読んでいるメモの読み取り位置が変わった
+--     ・12枚目の値が「時計で1フレームに1ずつ減る」以外の変わり方をした
+--     ・ステートを読み込んだ／フリーズを検出した／LOG_TICK フレームたった
+--   列はタブ区切りで、フレーム、何枚目、読み取り位置、12枚目の値、きっかけ。
 -- ロマンシング サガ（日本版）以外のゲームでは何もせずに終了する。
 -- それぞれのしくみは元の2つのファイルの冒頭の説明を参照。
 --
@@ -15,6 +22,9 @@
 local USE_KEEP_BRIGHT = true     -- 暗転中も画面を明るくする
 local USE_FREEZE_DETECT = true   -- フリーズと長い待ちを検出する
 local USE_MEMO_DISPLAY = true    -- いま読んでいるメモが何枚目かを表示する
+local USE_LOG = true             -- メモの枚数と読み取り位置の変化をファイルに記録する
+local LOG_PATH = "ladybug-log.txt"  -- 記録先。場所を決めたいときは "C:/.../ladybug-log.txt" のように書く
+local LOG_TICK = 600             -- 変化がなくても、このフレーム数ごとに1行書く（0 で書かない）
 
 local BRIGHT = 0x0F
 local BRIGHTEN_WHEN_UNKNOWN = true  -- 開始直後・ステート読み込み直後も明るくする
@@ -235,8 +245,76 @@ local function draw_memo()
   end
 end
 
+---------------------------------------------------------------- 記録
+local log_file = nil
+local log_prev_depth = nil
+local log_prev_ptr = nil
+local log_prev_lo = nil
+local log_prev_clock = nil
+local log_last_frame = -1000000
+local log_note = nil          -- 次の行に付けるきっかけ（ステート読み込みなど）
+local log_seen_freeze = nil
+
+if USE_LOG then
+  local err
+  log_file, err = io.open(LOG_PATH, "a")
+  if log_file == nil then
+    console.log("ladybug-tools: 記録ファイルを開けません（" .. tostring(err) .. "）。記録なしで続けます。")
+  else
+    log_file:write(string.format("# ladybug-tools 記録開始 フレーム %d\n", emu.framecount()))
+    log_file:write("# フレーム\t何枚目\t読み取り位置\t12枚目\tきっかけ\n")
+    log_file:flush()
+    event.onloadstate(function() log_note = "ステート読み込み" end, "ladybug-log-load")
+    event.onexit(function() if log_file ~= nil then log_file:close() log_file = nil end end, "ladybug-log-exit")
+  end
+end
+
+local function log_step()
+  if log_file == nil then return end
+  local now = emu.framecount()
+  local depth = memory.read_u8(0x129B, "WRAM")
+  local ptr = "--:----"
+  if depth < 16 then ptr = memo_ptr(depth) end
+  local lo = memory.read_u8(0x12F4, "WRAM")
+  local clock = memory.read_u8(0x12F5, "WRAM") + memory.read_u8(0x12F6, "WRAM") * 256
+
+  local why = log_note
+  log_note = nil
+  if why == nil and freeze_at ~= nil and freeze_at ~= log_seen_freeze then
+    why = "フリーズ検出 " .. freeze_kind
+  end
+  if freeze_at ~= nil then log_seen_freeze = freeze_at end
+  if why == nil then
+    if log_prev_depth == nil then
+      why = "開始"
+    elseif depth ~= log_prev_depth then
+      why = "枚数"
+    else
+      -- 12枚目は時計で1フレームに1ずつ減るのが普通。それ以外の変わり方だけを拾う
+      local clock_ok = (lo == log_prev_lo) and (clock == (log_prev_clock - 1) % 0x10000 or clock == log_prev_clock)
+      if not clock_ok then
+        why = "12枚目"
+      elseif depth ~= 11 and ptr ~= log_prev_ptr then
+        why = "位置"
+      elseif LOG_TICK > 0 and now - log_last_frame >= LOG_TICK then
+        why = "定期"
+      end
+    end
+  end
+
+  if why ~= nil then
+    log_file:write(string.format("%d\t%d\t%s\t%s\t%s\n", now, depth + 1, ptr, memo_ptr(11), why))
+    log_file:flush()
+    log_last_frame = now
+  end
+  log_prev_depth = depth
+  log_prev_ptr = ptr
+  log_prev_lo = lo
+  log_prev_clock = clock
+end
+
 ---------------------------------------------------------------- 毎フレームの処理
-console.log("ladybug-tools: 動作中（明るさ固定=" .. tostring(USE_KEEP_BRIGHT) .. "、フリーズ検出=" .. tostring(USE_FREEZE_DETECT) .. "、メモ表示=" .. tostring(USE_MEMO_DISPLAY) .. "）")
+console.log("ladybug-tools: 動作中（明るさ固定=" .. tostring(USE_KEEP_BRIGHT) .. "、フリーズ検出=" .. tostring(USE_FREEZE_DETECT) .. "、メモ表示=" .. tostring(USE_MEMO_DISPLAY) .. "、記録=" .. tostring(USE_LOG) .. "）")
 while true do
   if USE_KEEP_BRIGHT then
     local dark
@@ -268,5 +346,6 @@ while true do
       pause_pending = 1
     end
   end
+  if USE_LOG then log_step() end
   emu.frameadvance()
 end
