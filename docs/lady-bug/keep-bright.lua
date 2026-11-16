@@ -1,21 +1,30 @@
 -- 暗転中も画面を見えるようにする（BizHawk 2.11 / BSNESv115+ 用）
--- 毎フレームの直前に、画面の明るさレジスタ $2100 へ $0F（最大の明るさ・表示オン）を書き込む。
--- $2100 は書き込み専用でゲーム側からは読めないため、入力の同期には影響しない。
+--
+-- しくみ：
+--   ゲームが画面の明るさレジスタ $2100 に書いた値を見張り、
+--   「表示はオンのまま明るさだけを下げている」ときに限って、$0F（最大の明るさ）で上書きする。
+--   ゲームが「表示オフ」（値 $80 以上）にしている間は手を出さない。
+--   表示オフの間はゲームが画像データを読み込んでいて、そこで無理に表示をオンにすると
+--   読み込みが失敗して画面が壊れたままになるため。
+--   $2100 は書き込み専用でゲーム側からは読めないので、入力の同期には影響しない。
+--
 -- 使い方：ROM（またはムービー）を読み込んでから、Tools → Lua Console でこのファイルを開く。
 --         止めるときはスクリプトを停止する。
 
 local BRIGHT = 0x0F
 local BUS = "System Bus"
 
--- 「System Bus」がない状態では何も書き込まずに終了する
--- （ない場合、BizHawk は別の領域に書き込んでしまい、ゲームのRAMを壊すため）
+-- スクリプトの開始直後とステートの読み込み直後は、ゲームが最後に書いた値が分からない。
+-- true ：分からない間も明るくする（暗転中のステートから始めるとき用）
+-- false：ゲームが次に $2100 へ書くまで何もしない（安全側）
+local BRIGHTEN_WHEN_UNKNOWN = true
+
 local found = false
 local names = {}
 for _, name in pairs(memory.getmemorydomainlist()) do
   names[#names + 1] = name
   if name == BUS then found = true end
 end
-
 if not found then
   console.log("keep-bright: 「System Bus」が見つからないため、何も書き込まずに終了します。")
   console.log("keep-bright: いまの領域一覧 = " .. table.concat(names, ", "))
@@ -23,8 +32,27 @@ if not found then
   return
 end
 
-console.log("keep-bright: 動作中（" .. BUS .. " の $2100 に書き込みます）")
+local last = nil      -- ゲームが最後に $2100 へ書いた値（分からないときは nil）
+local mine = false    -- 自分の書き込み中は見張りを無視する
+
+event.on_bus_write(function(addr, val, flags)
+  if not mine and val ~= nil then last = val end
+end, 0x2100, "keep-bright-watch", BUS)
+
+event.onloadstate(function() last = nil end, "keep-bright-load")
+
+console.log("keep-bright: 動作中")
 while true do
-  memory.write_u8(0x2100, BRIGHT, BUS)
+  local dark
+  if last == nil then
+    dark = BRIGHTEN_WHEN_UNKNOWN
+  else
+    dark = (last < 0x80) and (last % 16 < BRIGHT)
+  end
+  if dark then
+    mine = true
+    memory.write_u8(0x2100, BRIGHT, BUS)
+    mine = false
+  end
   emu.frameadvance()
 end
