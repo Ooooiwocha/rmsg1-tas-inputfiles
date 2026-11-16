@@ -4,6 +4,7 @@
 -- さらに、いま読んでいるメモが何枚目か（スタックの段数）を画面に表示する。
 --   1行目：MEMO 何枚目 と、その読み取り位置（バンク:番地）
 --   2行目：12枚目のメモの中身（時計と重なっていて毎フレーム変わる）
+--   3行目：IDLE 最後にスクリプトの命令を読んでからのフレーム数（開始直後・ステート読み込み直後は ?）
 --   12枚目以上を読んでいる間は赤、それ以外は白で表示する。
 -- ロマンシング サガ（日本版）以外のゲームでは何もせずに終了する。
 -- それぞれのしくみは元の2つのファイルの冒頭の説明を参照。
@@ -187,6 +188,13 @@ local function memo_ptr(index)
   return string.format("%02X:%02X%02X", bank, hi, lo)
 end
 
+-- 最後にスクリプトの命令を読んでから何フレームたったか（命令の読み出し口 $00:A0A5 を見張る）
+local last_cmd_frame = nil
+if USE_MEMO_DISPLAY then
+  event.on_bus_exec(function() last_cmd_frame = emu.framecount() end, 0x00A0A5, "ladybug-cmd", BUS)
+  event.onloadstate(function() last_cmd_frame = nil end, "ladybug-cmd-load")
+end
+
 local function draw_memo()
   local depth = memory.read_u8(0x129B, "WRAM")
   local color = "white"
@@ -195,6 +203,11 @@ local function draw_memo()
   if depth < 16 then where = memo_ptr(depth) end
   gui.text(4, 60, string.format("MEMO %d  %s", depth + 1, where), color)
   gui.text(4, 76, string.format("12th   %s", memo_ptr(11)), color)
+  if last_cmd_frame == nil then
+    gui.text(4, 92, "IDLE   ?", "white")
+  else
+    gui.text(4, 92, string.format("IDLE   %d", emu.framecount() - last_cmd_frame), "white")
+  end
 end
 
 ---------------------------------------------------------------- 毎フレームの処理
