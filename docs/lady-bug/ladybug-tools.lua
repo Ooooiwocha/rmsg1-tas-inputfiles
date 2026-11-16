@@ -141,26 +141,6 @@ local function on_list_loop()
   end
 end
 
--- フレーム待ちから戻れない型：ゲームは「次のフレームまで待つ」とき、割り込み処理が
--- 合図（$1206）を消すのを待つ。割り込みが止められたままこの待ちに入ると永久に戻れない。
--- このときゲームは入力を読まないフレーム（ラグフレーム）が続くので、その連続数で判定する
--- （7,279Fのムービーでは最長でも37フレーム）。
-local LAG_FREEZE = 180
-local lag_run = 0
-local function check_lag()
-  if emu.islagged() then lag_run = lag_run + 1 else lag_run = 0 end
-  if lag_run >= LAG_FREEZE and crash_run < CRASH_FRAMES then
-    local now = emu.framecount()
-    if lag_run == LAG_FREEZE then
-      freeze_at = now - LAG_FREEZE
-      freeze_kind = "frame wait (interrupt off)"
-      console.log(string.format("freeze-detect: フレーム %d ごろから、フレーム待ちから戻れなくなっています（割り込みが止まったまま）。", freeze_at))
-      if PAUSE_ON_FREEZE then pause_pending = 2 end
-    end
-    freeze_frame = now
-  end
-end
-
 -- 暴走：プログラムがROMではなくRAMの中を実行し始めた状態。スタックの位置もでたらめになり、
 -- メモリを壊しながら回り続ける。フレームの切れ目での実行位置が RAM（番地 $8000 未満、
 -- またはバンク $7E/$7F）にある状態が CRASH_FRAMES フレーム続いたら暴走とみなす
@@ -179,6 +159,26 @@ local function check_crash()
       freeze_at = now - CRASH_FRAMES
       freeze_kind = "crash (running in RAM)"
       console.log(string.format("freeze-detect: フレーム %d ごろからプログラムが暴走しています（RAMの中を実行中。実行位置 $%06X）。", freeze_at, pc))
+      if PAUSE_ON_FREEZE then pause_pending = 2 end
+    end
+    freeze_frame = now
+  end
+end
+
+-- フレーム待ちから戻れない型：ゲームは「次のフレームまで待つ」とき、割り込み処理が
+-- 合図（$1206）を消すのを待つ。割り込みが止められたままこの待ちに入ると永久に戻れない。
+-- このときゲームは入力を読まないフレーム（ラグフレーム）が続くので、その連続数で判定する
+-- （7,279Fのムービーでは最長でも37フレーム）。
+local LAG_FREEZE = 180
+local lag_run = 0
+local function check_lag()
+  if emu.islagged() then lag_run = lag_run + 1 else lag_run = 0 end
+  if lag_run >= LAG_FREEZE and crash_run < CRASH_FRAMES then
+    local now = emu.framecount()
+    if lag_run == LAG_FREEZE then
+      freeze_at = now - LAG_FREEZE
+      freeze_kind = "frame wait (interrupt off)"
+      console.log(string.format("freeze-detect: フレーム %d ごろから、フレーム待ちから戻れなくなっています（割り込みが止まったまま）。", freeze_at))
       if PAUSE_ON_FREEZE then pause_pending = 2 end
     end
     freeze_frame = now
