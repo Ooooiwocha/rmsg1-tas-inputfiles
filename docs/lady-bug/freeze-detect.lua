@@ -9,6 +9,8 @@
 --      選択位置（$12CC）が見えるまで一覧を送る処理が、$12CC=$FF などのとき終わらない。
 --   1c) フレーム待ちから戻れない（フリーズ）
 --      割り込みが止められたまま「次のフレームまで待つ」処理に入ると戻れない。
+--   1d) 暴走
+--      プログラムがRAMの中を実行し始めた状態。スタックの位置もでたらめになる。
 --   2) 命令 14 の長い待ち
 --      命令 14 n は n×2 フレーム待つ。n が 0 のときは約65,000フレーム（約18分）待つ。
 --      LONG_WAIT フレーム以上の待ちが始まったら知らせる。
@@ -100,12 +102,36 @@ local LAG_FREEZE = 180
 local lag_run = 0
 local function check_lag()
   if emu.islagged() then lag_run = lag_run + 1 else lag_run = 0 end
-  if lag_run >= LAG_FREEZE then
+  if lag_run >= LAG_FREEZE and crash_run < CRASH_FRAMES then
     local now = emu.framecount()
     if lag_run == LAG_FREEZE then
       freeze_at = now - LAG_FREEZE
       freeze_kind = "frame wait (interrupt off)"
       console.log(string.format("freeze-detect: フレーム %d ごろから、フレーム待ちから戻れなくなっています（割り込みが止まったまま）。", freeze_at))
+      if PAUSE_ON_FREEZE then pause_pending = 2 end
+    end
+    freeze_frame = now
+  end
+end
+
+-- 暴走：プログラムがROMではなくRAMの中を実行し始めた状態。スタックの位置もでたらめになり、
+-- メモリを壊しながら回り続ける。フレームの切れ目での実行位置が RAM（番地 $8000 未満、
+-- またはバンク $7E/$7F）にある状態が CRASH_FRAMES フレーム続いたら暴走とみなす
+-- （7,279Fのムービーでは1回もない）。
+local CRASH_FRAMES = 5
+local crash_run = 0
+local function check_crash()
+  local pc = reg("PC")
+  if pc == nil then return end
+  local bank = math.floor(pc / 0x10000) % 0x100
+  local addr = pc % 0x10000
+  if addr < 0x8000 or bank == 0x7E or bank == 0x7F then crash_run = crash_run + 1 else crash_run = 0 end
+  if crash_run >= CRASH_FRAMES then
+    local now = emu.framecount()
+    if crash_run == CRASH_FRAMES then
+      freeze_at = now - CRASH_FRAMES
+      freeze_kind = "crash (running in RAM)"
+      console.log(string.format("freeze-detect: フレーム %d ごろからプログラムが暴走しています（RAMの中を実行中。実行位置 $%06X）。", freeze_at, pc))
       if PAUSE_ON_FREEZE then pause_pending = 2 end
     end
     freeze_frame = now
@@ -132,12 +158,14 @@ event.on_bus_exec(on_list_loop, 0x00BD97, "freeze-detect-bd97", BUS)
 event.onloadstate(function()
   freeze_frame = -1000
   lag_run = 0
+  crash_run = 0
   freeze_at = nil
   wait_until = -1
 end, "freeze-detect-load")
 
 console.log("freeze-detect: 動作中")
 while true do
+  check_crash()
   check_lag()
   local now = emu.framecount()
   if now - freeze_frame <= 30 and freeze_at ~= nil then
