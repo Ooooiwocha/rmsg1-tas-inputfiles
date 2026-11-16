@@ -189,8 +189,10 @@ end
 
 -- 入れ子の途中での「イベント終了」（副命令 40 4B、処理は $00:B861）。
 -- 港の追い返しのたびに「イベント → フィールド側の命令 → イベント」の呼び出しが1段ずつ深くなる。
--- その途中で 40 4B を読むと、メモは全部捨てられるのに呼び出しの入れ子は残り、
--- 内側の処理に取り残される（操作不能のまま回り続ける、あとで暴走する、などを確認）。
+-- その途中で 40 4B を読むと、メモは全部捨てられ、呼び出しの入れ子は1段だけ戻る。
+-- そのあとは場面しだい：直後に操作不能・フリーズ・暴走になる例もあれば、
+-- 40 4B を何度か通って入れ子が浅くなり、港のスクリプトを読み続ける例もある。
+-- フリーズを避けて長く進んだ試行は、どれもここを通っていた（docs/lady-bug/freezes.md）。
 -- 正常な場面ではスタックの位置は $1EE8 付近。入れ子1段ごとに下がるので、$1EA0 未満なら入れ子とみなす。
 local nested_end_frame = nil
 local nested_end_s = 0
@@ -199,7 +201,7 @@ local function on_end_event()
   if sp == nil or sp >= 0x1EA0 then return end
   nested_end_frame = emu.framecount()
   nested_end_s = sp
-  console.log(string.format("freeze-detect: フレーム %d で、呼び出しの入れ子が残ったままイベント終了（40 4B）を読みました（スタック $%04X）。行き止まりになる可能性が高い状態です。", nested_end_frame, sp))
+  console.log(string.format("freeze-detect: フレーム %d で、呼び出しの入れ子が残ったままイベント終了（40 4B）を読みました（スタック $%04X）。", nested_end_frame, sp))
   if PAUSE_ON_NESTED_END then pause_pending = 2 end
 end
 
