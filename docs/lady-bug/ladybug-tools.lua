@@ -30,6 +30,7 @@ local BRIGHT = 0x0F
 local BRIGHTEN_WHEN_UNKNOWN = true  -- 開始直後・ステート読み込み直後も明るくする
 local PAUSE_ON_FREEZE = true        -- フリーズを検出したら一時停止する
 local LONG_WAIT = 600               -- このフレーム数以上の待ち（命令 14）を知らせる
+local PAUSE_ON_NESTED_END = false  -- 入れ子の途中で「イベント終了」（40 4B）を読んだら一時停止する
 
 local BUS = "System Bus"
 local ROM_SHA1 = "D00960176AA980DBD7BFF4062E52B7450B9986DD"
@@ -184,6 +185,22 @@ local function check_crash()
   end
 end
 
+-- 入れ子の途中での「イベント終了」（副命令 40 4B、処理は $00:B861）。
+-- 港の追い返しのたびに「イベント → フィールド側の命令 → イベント」の呼び出しが1段ずつ深くなる。
+-- その途中で 40 4B を読むと、メモは全部捨てられるのに呼び出しの入れ子は残り、
+-- 内側の処理に取り残される（操作不能のまま回り続ける、あとで暴走する、などを確認）。
+-- 正常な場面ではスタックの位置は $1EE8 付近。入れ子1段ごとに下がるので、$1EA0 未満なら入れ子とみなす。
+local nested_end_frame = nil
+local nested_end_s = 0
+local function on_end_event()
+  local sp = reg("S")
+  if sp == nil or sp >= 0x1EA0 then return end
+  nested_end_frame = emu.framecount()
+  nested_end_s = sp
+  console.log(string.format("freeze-detect: フレーム %d で、呼び出しの入れ子が残ったままイベント終了（40 4B）を読みました（スタック $%04X）。行き止まりになる可能性が高い状態です。", nested_end_frame, sp))
+  if PAUSE_ON_NESTED_END then pause_pending = 2 end
+end
+
 local function on_wait14()
   local x = reg("X")
   if x == nil then return end
@@ -201,12 +218,14 @@ if USE_FREEZE_DETECT then
 event.on_bus_exec(on_scroll_loop, 0x00A464, "freeze-detect-a464", BUS)
 event.on_bus_exec(on_scroll_loop, 0x00C75A, "freeze-detect-c75a", BUS)
 event.on_bus_exec(on_wait14, 0x00C6A4, "freeze-detect-c6a4", BUS)
+event.on_bus_exec(on_end_event, 0x00B861, "freeze-detect-b861", BUS)
 event.on_bus_exec(on_list_loop, 0x00BD97, "freeze-detect-bd97", BUS)
 end
 event.onloadstate(function()
   freeze_frame = -1000
   lag_run = 0
   crash_run = 0
+  nested_end_frame = nil
   freeze_at = nil
   wait_until = -1
 end, "freeze-detect-load")
@@ -254,6 +273,7 @@ local log_prev_clock = nil
 local log_last_frame = -1000000
 local log_note = nil          -- 次の行に付けるきっかけ（ステート読み込みなど）
 local log_seen_freeze = nil
+local log_seen_nested = nil
 
 if USE_LOG then
   local err
@@ -280,6 +300,10 @@ local function log_step()
 
   local why = log_note
   log_note = nil
+  if why == nil and nested_end_frame ~= nil and nested_end_frame ~= log_seen_nested then
+    why = string.format("入れ子のままイベント終了 S=%04X", nested_end_s)
+  end
+  log_seen_nested = nested_end_frame
   if why == nil and freeze_at ~= nil and freeze_at ~= log_seen_freeze then
     why = "フリーズ検出 " .. freeze_kind
   end
@@ -338,6 +362,9 @@ while true do
       gui.text(4, 40, string.format("FREEZE: %s since frame %d", freeze_kind, freeze_at), "red")
     elseif now < wait_until then
       gui.text(4, 20, string.format("LONG WAIT: %d frames left (of %d)", wait_until - now, wait_len), "yellow")
+    end
+    if nested_end_frame ~= nil then
+      gui.text(4, 108, string.format("NESTED END (40 4B) at frame %d  S=%04X", nested_end_frame, nested_end_s), "yellow")
     end
     if pause_pending == 1 then
       pause_pending = 0
