@@ -1,6 +1,10 @@
 -- レイディバグ検証用のまとめスクリプト（BizHawk 2.11 / BSNESv115+ 用）
 -- keep-bright.lua（暗転中も画面を見えるようにする）と
 -- freeze-detect.lua（フリーズと長い待ちを検出する）を1本にしたもの。
+-- さらに、いま読んでいるメモが何枚目か（スタックの段数）を画面に表示する。
+--   1行目：MEMO 何枚目 と、その読み取り位置（バンク:番地）
+--   2行目：12枚目のメモの中身（時計と重なっていて毎フレーム変わる）
+--   12枚目以上を読んでいる間は赤、それ以外は白で表示する。
 -- ロマンシング サガ（日本版）以外のゲームでは何もせずに終了する。
 -- それぞれのしくみは元の2つのファイルの冒頭の説明を参照。
 --
@@ -9,6 +13,7 @@
 
 local USE_KEEP_BRIGHT = true     -- 暗転中も画面を明るくする
 local USE_FREEZE_DETECT = true   -- フリーズと長い待ちを検出する
+local USE_MEMO_DISPLAY = true    -- いま読んでいるメモが何枚目かを表示する
 
 local BRIGHT = 0x0F
 local BRIGHTEN_WHEN_UNKNOWN = true  -- 開始直後・ステート読み込み直後も明るくする
@@ -143,8 +148,29 @@ event.onloadstate(function()
 end, "freeze-detect-load")
 
 
+---------------------------------------------------------------- メモの表示
+-- 枚数は $129B（0 が1枚目）。メモは1枚8バイトで $129C から並び、
+-- 先頭3バイトが読み取り位置（下位、上位、バンク）。
+local function memo_ptr(index)
+  local base = 0x129C + index * 8
+  local lo = memory.read_u8(base, "WRAM")
+  local hi = memory.read_u8(base + 1, "WRAM")
+  local bank = memory.read_u8(base + 2, "WRAM")
+  return string.format("%02X:%02X%02X", bank, hi, lo)
+end
+
+local function draw_memo()
+  local depth = memory.read_u8(0x129B, "WRAM")
+  local color = "white"
+  if depth >= 11 then color = "red" end
+  local where = "--:----"
+  if depth < 16 then where = memo_ptr(depth) end
+  gui.text(4, 60, string.format("MEMO %d  %s", depth + 1, where), color)
+  gui.text(4, 76, string.format("12th   %s", memo_ptr(11)), color)
+end
+
 ---------------------------------------------------------------- 毎フレームの処理
-console.log("ladybug-tools: 動作中（明るさ固定=" .. tostring(USE_KEEP_BRIGHT) .. "、フリーズ検出=" .. tostring(USE_FREEZE_DETECT) .. "）")
+console.log("ladybug-tools: 動作中（明るさ固定=" .. tostring(USE_KEEP_BRIGHT) .. "、フリーズ検出=" .. tostring(USE_FREEZE_DETECT) .. "、メモ表示=" .. tostring(USE_MEMO_DISPLAY) .. "）")
 while true do
   if USE_KEEP_BRIGHT then
     local dark
@@ -159,6 +185,7 @@ while true do
       mine = false
     end
   end
+  if USE_MEMO_DISPLAY then draw_memo() end
   if USE_FREEZE_DETECT then
     local now = emu.framecount()
     if now - freeze_frame <= 30 and freeze_at ~= nil then
