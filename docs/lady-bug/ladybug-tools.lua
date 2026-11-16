@@ -100,8 +100,8 @@ local function on_scroll_loop()
 end
 
 -- 選択肢の窓の送りループ：選択位置（$12CC）が見えるところまで一覧を2行ずつ送る処理。
--- $12CC が $FF などのとき終わらない。このループはフレームを待たずに回り続けるので、
--- 1フレームの間にループ本体（$00:BD97）を通った回数で判定する（正常なら多くても128回）。
+-- $12CC が $FF などのとき終わらない。ループ本体（$00:BD97）に来たときの $12CC の値で判定する。
+-- フレームを待たずに回る場合に備えて、1フレームに200回以上通ったときもフリーズとみなす。
 local list_count = 0
 local list_frame = -1
 local function on_list_loop()
@@ -111,11 +111,18 @@ local function on_list_loop()
     list_count = 0
   end
   list_count = list_count + 1
-  if list_count == 200 then
+  -- 終わらない条件：選択位置が $FF、または $FE で下端の行番号が偶数（2ずつ増えるので追い越せない）
+  local target = memory.read_u8(0x12CC, "WRAM")
+  local endless = (target == 0xFF)
+  if target == 0xFE then
+    local y = reg("Y")
+    if y ~= nil and memory.read_u8(0x1618 + (y % 0x10000), "WRAM") % 2 == 0 then endless = true end
+  end
+  if endless or list_count == 200 then
     if now - freeze_frame > 30 then
       freeze_at = now
       freeze_kind = "list loop"
-      console.log(string.format("freeze-detect: フレーム %d で選択肢の窓の送りループ（フリーズ）に入りました。$12CC=$%02X", now, memory.read_u8(0x12CC, "WRAM")))
+      console.log(string.format("freeze-detect: フレーム %d で選択肢の窓の送りループ（フリーズ）に入りました。$12CC=$%02X", now, target))
       if PAUSE_ON_FREEZE then pause_pending = 2 end
     end
     freeze_frame = now
