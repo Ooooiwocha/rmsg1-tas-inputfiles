@@ -12,6 +12,7 @@
 --     ・読んでいるメモの読み取り位置が変わった
 --     ・12枚目の値が「時計で1フレームに1ずつ減る」以外の変わり方をした
 --     ・ステートを読み込んだ／フリーズを検出した／LOG_TICK フレームたった
+--   巻き戻し中は書かず、進み始めたところで「巻き戻し」と1行書く。
 --   列はタブ区切りで、フレーム、何枚目、読み取り位置、12枚目の値、きっかけ。
 -- ロマンシング サガ（日本版）以外のゲームでは何もせずに終了する。
 -- それぞれのしくみは元の2つのファイルの冒頭の説明を参照。
@@ -264,6 +265,9 @@ local function draw_memo()
   end
 end
 
+local prev_frame = nil
+local rewinding = false   -- このフレームが巻き戻しで来たものか（毎フレームの処理で更新）
+
 ---------------------------------------------------------------- 記録
 local log_file = nil
 local log_prev_depth = nil
@@ -297,6 +301,18 @@ local function log_step()
   if depth < 16 then ptr = memo_ptr(depth) end
   local lo = memory.read_u8(0x12F4, "WRAM")
   local clock = memory.read_u8(0x12F5, "WRAM") + memory.read_u8(0x12F6, "WRAM") * 256
+
+  -- 巻き戻し中は書かない。巻き戻しが終わって進み始めたフレームで1行だけ書く
+  if rewinding then
+    log_note = "巻き戻し"
+    log_prev_depth = depth
+    log_prev_ptr = ptr
+    log_prev_lo = lo
+    log_prev_clock = clock
+    log_seen_freeze = nil
+    log_seen_nested = nil
+    return
+  end
 
   local why = log_note
   log_note = nil
@@ -338,8 +354,29 @@ local function log_step()
 end
 
 ---------------------------------------------------------------- 毎フレームの処理
+-- 巻き戻し（フレーム番号が前より小さくなった）への対応。
+-- 巻き戻しではステート読み込みの通知が来ないので、ここで検出の状態を捨てる。
+-- 捨てないと、巻き戻す前のフリーズの記憶が残り、巻き戻した先で同じフリーズに入っても検出されない。
+local function check_rewind()
+  local now = emu.framecount()
+  rewinding = (prev_frame ~= nil and now < prev_frame)
+  prev_frame = now
+  if rewinding then
+    freeze_frame = -1000
+    freeze_at = nil
+    wait_until = -1
+    lag_run = 0
+    crash_run = 0
+    pause_pending = 0
+    nested_end_frame = nil
+    last_cmd_frame = nil
+    last = nil
+  end
+end
+
 console.log("ladybug-tools: 動作中（明るさ固定=" .. tostring(USE_KEEP_BRIGHT) .. "、フリーズ検出=" .. tostring(USE_FREEZE_DETECT) .. "、メモ表示=" .. tostring(USE_MEMO_DISPLAY) .. "、記録=" .. tostring(USE_LOG) .. "）")
 while true do
+  check_rewind()
   if USE_KEEP_BRIGHT then
     local dark
     if last == nil then

@@ -164,7 +164,27 @@ event.onloadstate(function()
 end, "freeze-detect-load")
 
 console.log("freeze-detect: 動作中")
+-- 巻き戻し（フレーム番号が前より小さくなった）への対応。
+-- 巻き戻しではステート読み込みの通知が来ないので、ここで検出の状態を捨てる。
+-- 捨てないと、巻き戻す前のフリーズの記憶が残り、巻き戻した先で同じフリーズに入っても検出されない。
+local prev_frame = nil
+local rewinding = false
+local function check_rewind()
+  local now = emu.framecount()
+  rewinding = (prev_frame ~= nil and now < prev_frame)
+  prev_frame = now
+  if rewinding then
+    freeze_frame = -1000
+    freeze_at = nil
+    wait_until = -1
+    lag_run = 0
+    crash_run = 0
+    pause_pending = 0
+  end
+end
+
 while true do
+  check_rewind()
   check_crash()
   check_lag()
   local now = emu.framecount()
