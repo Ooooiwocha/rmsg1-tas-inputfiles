@@ -26,6 +26,7 @@ local USE_MEMO_DISPLAY = true    -- いま読んでいるメモが何枚目か�
 local USE_LOG = true             -- メモの枚数と読み取り位置の変化をファイルに記録する
 local LOG_PATH = "ladybug-log.txt"  -- 記録先。場所を決めたいときは "C:/.../ladybug-log.txt" のように書く
 local LOG_TICK = 600             -- 変化がなくても、このフレーム数ごとに1行書く（0 で書かない）
+local IDLE_WARN = 1800           -- 命令をこのフレーム数読んでいなければ知らせる（IDLE を黄色にし、記録に1行書く）
 
 local BRIGHT = 0x0F
 local BRIGHTEN_WHEN_UNKNOWN = true  -- 開始直後・ステート読み込み直後も明るくする
@@ -261,7 +262,10 @@ local function draw_memo()
   if last_cmd_frame == nil then
     gui.text(4, 92, "IDLE   ?", "white")
   else
-    gui.text(4, 92, string.format("IDLE   %d", emu.framecount() - last_cmd_frame), "white")
+    local idle = emu.framecount() - last_cmd_frame
+    local idle_color = "white"
+    if idle >= IDLE_WARN then idle_color = "yellow" end
+    gui.text(4, 92, string.format("IDLE   %d", idle), idle_color)
   end
 end
 
@@ -320,6 +324,9 @@ local function log_step()
     why = string.format("入れ子のままイベント終了 S=%04X", nested_end_s)
   end
   log_seen_nested = nested_end_frame
+  if why == nil and last_cmd_frame ~= nil and now - last_cmd_frame == IDLE_WARN then
+    why = string.format("命令を%dフレーム読んでいない", IDLE_WARN)
+  end
   if why == nil and freeze_at ~= nil and freeze_at ~= log_seen_freeze then
     why = "フリーズ検出 " .. freeze_kind
   end
