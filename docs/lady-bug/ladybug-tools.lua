@@ -1,0 +1,144 @@
+-- レイディバグ検証用のまとめスクリプト（BizHawk 2.11 / BSNESv115+ 用）
+-- keep-bright.lua（暗転中も画面を見えるようにする）と
+-- freeze-detect.lua（フリーズと長い待ちを検出する）を1本にしたもの。
+-- ロマンシング サガ（日本版）以外のゲームでは何もせずに終了する。
+-- それぞれのしくみは元の2つのファイルの冒頭の説明を参照。
+--
+-- 使い方：ROM（またはムービー）を読み込んでから、Tools → Lua Console でこのファイルを開く。
+--         起動時の引数なら  EmuHawk.exe --lua="このファイル" "ROM"
+
+local USE_KEEP_BRIGHT = true     -- 暗転中も画面を明るくする
+local USE_FREEZE_DETECT = true   -- フリーズと長い待ちを検出する
+
+local BRIGHT = 0x0F
+local BRIGHTEN_WHEN_UNKNOWN = true  -- 開始直後・ステート読み込み直後も明るくする
+local PAUSE_ON_FREEZE = true        -- フリーズを検出したら一時停止する
+local LONG_WAIT = 600               -- このフレーム数以上の待ち（命令 14）を知らせる
+
+local BUS = "System Bus"
+local ROM_SHA1 = "D00960176AA980DBD7BFF4062E52B7450B9986DD"
+
+-- ゲームの判定（ハッシュが一致するか、名前に Romancing SaGa を含むか）
+local hash = string.upper(tostring(gameinfo.getromhash() or ""))
+local name = tostring(gameinfo.getromname() or "")
+if not string.find(hash, ROM_SHA1, 1, true) and not string.find(name, "Romancing SaGa", 1, true) then
+  console.log("ladybug-tools: ロマンシング サガ（日本版）ではないので何もしません。 名前=" .. name .. " ハッシュ=" .. hash)
+  return
+end
+
+local found = false
+local names = {}
+for _, n in pairs(memory.getmemorydomainlist()) do
+  names[#names + 1] = n
+  if n == BUS then found = true end
+end
+if not found then
+  console.log("ladybug-tools: 「System Bus」が見つからないため終了します。領域一覧 = " .. table.concat(names, ", "))
+  console.log("ladybug-tools: SNESコアを BSNESv115+ にして、ROMを読み込んでから実行してください。")
+  return
+end
+
+---------------------------------------------------------------- keep-bright
+local last = nil      -- ゲームが最後に $2100 へ書いた値（分からないときは nil）
+local mine = false    -- 自分の書き込み中は見張りを無視する
+
+local function watch(addr, val, flags)
+  if not mine and val ~= nil then last = val end
+end
+
+-- $2100 はバンク $00〜$3F と $80〜$BF のどこからでも同じレジスタに届く。
+-- ゲームはバンク $00 以外からも書くので、全部のバンクを見張る
+-- （バンク $00 だけを見張ると「表示オフ」を見逃して画面が壊れる）。
+if USE_KEEP_BRIGHT then
+for bank = 0, 0xFF do
+  if bank % 0x80 < 0x40 then
+    event.on_bus_write(watch, bank * 0x10000 + 0x2100, "keep-bright-watch-" .. bank, BUS)
+  end
+end
+end
+
+event.onloadstate(function() last = nil end, "keep-bright-load")
+
+
+---------------------------------------------------------------- freeze-detect
+local freeze_frame = -1000   -- 最後にフリーズのループを見たフレーム
+local freeze_at = nil        -- フリーズが始まったフレーム
+local wait_until = -1        -- 長い待ちが終わる予定のフレーム
+local wait_len = 0
+local warned_reg = false
+
+local function reg(name)
+  local ok, v = pcall(emu.getregister, name)
+  if ok and v ~= nil then return v end
+  if not warned_reg then
+    warned_reg = true
+    console.log("freeze-detect: レジスタ " .. name .. " を読めません。検出できません。")
+  end
+  return nil
+end
+
+local function on_scroll_loop()
+  local y = reg("Y")
+  if y == nil then return end
+  local height = memory.read_u8(0x1606 + (y % 0x10000), "WRAM")
+  if height ~= 0 then return end
+  local now = emu.framecount()
+  if now - freeze_frame > 30 then
+    freeze_at = now
+    console.log(string.format("freeze-detect: フレーム %d で窓の行送りループ（フリーズ）に入りました。窓の位置 Y=$%02X", now, y))
+    if PAUSE_ON_FREEZE then client.pause() end
+  end
+  freeze_frame = now
+end
+
+local function on_wait14()
+  local x = reg("X")
+  if x == nil then return end
+  local frames = x
+  if frames == 0 then frames = 65536 end
+  if frames >= LONG_WAIT then
+    local now = emu.framecount()
+    wait_until = now + frames
+    wait_len = frames
+    console.log(string.format("freeze-detect: フレーム %d で命令 14 の長い待ち（%d フレーム）が始まりました。", now, frames))
+  end
+end
+
+if USE_FREEZE_DETECT then
+event.on_bus_exec(on_scroll_loop, 0x00A464, "freeze-detect-a464", BUS)
+event.on_bus_exec(on_scroll_loop, 0x00C75A, "freeze-detect-c75a", BUS)
+event.on_bus_exec(on_wait14, 0x00C6A4, "freeze-detect-c6a4", BUS)
+end
+event.onloadstate(function()
+  freeze_frame = -1000
+  freeze_at = nil
+  wait_until = -1
+end, "freeze-detect-load")
+
+
+---------------------------------------------------------------- 毎フレームの処理
+console.log("ladybug-tools: 動作中（明るさ固定=" .. tostring(USE_KEEP_BRIGHT) .. "、フリーズ検出=" .. tostring(USE_FREEZE_DETECT) .. "）")
+while true do
+  if USE_KEEP_BRIGHT then
+    local dark
+    if last == nil then
+      dark = BRIGHTEN_WHEN_UNKNOWN
+    else
+      dark = (last < 0x80) and (last % 16 < BRIGHT)
+    end
+    if dark then
+      mine = true
+      memory.write_u8(0x2100, BRIGHT, BUS)
+      mine = false
+    end
+  end
+  if USE_FREEZE_DETECT then
+    local now = emu.framecount()
+    if now - freeze_frame <= 30 and freeze_at ~= nil then
+      gui.text(4, 20, string.format("FREEZE: scroll loop since frame %d", freeze_at), "red")
+    elseif now < wait_until then
+      gui.text(4, 20, string.format("LONG WAIT: %d frames left (of %d)", wait_until - now, wait_len), "yellow")
+    end
+  end
+  emu.frameadvance()
+end
