@@ -7,6 +7,8 @@
 --      ループの入口（$00:A464 と $00:C75A）に来たとき、窓の高さ（$1606+Y）が0なら検出とする。
 --   1b) 選択肢の窓の送りループ（フリーズ）
 --      選択位置（$12CC）が見えるまで一覧を送る処理が、$12CC=$FF などのとき終わらない。
+--   1c) フレーム待ちから戻れない（フリーズ）
+--      割り込みが止められたまま「次のフレームまで待つ」処理に入ると戻れない。
 --   2) 命令 14 の長い待ち
 --      命令 14 n は n×2 フレーム待つ。n が 0 のときは約65,000フレーム（約18分）待つ。
 --      LONG_WAIT フレーム以上の待ちが始まったら知らせる。
@@ -83,6 +85,26 @@ local function on_list_loop()
   end
 end
 
+-- フレーム待ちから戻れない型：ゲームは「次のフレームまで待つ」とき、割り込み処理が
+-- 合図（$1206）を消すのを待つ。割り込みが止められたままこの待ちに入ると永久に戻れない。
+-- このときゲームは入力を読まないフレーム（ラグフレーム）が続くので、その連続数で判定する
+-- （7,279Fのムービーでは最長でも37フレーム）。
+local LAG_FREEZE = 180
+local lag_run = 0
+local function check_lag()
+  if emu.islagged() then lag_run = lag_run + 1 else lag_run = 0 end
+  if lag_run >= LAG_FREEZE then
+    local now = emu.framecount()
+    if lag_run == LAG_FREEZE then
+      freeze_at = now - LAG_FREEZE
+      freeze_kind = "frame wait (interrupt off)"
+      console.log(string.format("freeze-detect: フレーム %d ごろから、フレーム待ちから戻れなくなっています（割り込みが止まったまま）。", freeze_at))
+      if PAUSE_ON_FREEZE then pause_pending = 2 end
+    end
+    freeze_frame = now
+  end
+end
+
 local function on_wait14()
   local x = reg("X")
   if x == nil then return end
@@ -102,12 +124,14 @@ event.on_bus_exec(on_wait14, 0x00C6A4, "freeze-detect-c6a4", BUS)
 event.on_bus_exec(on_list_loop, 0x00BD97, "freeze-detect-bd97", BUS)
 event.onloadstate(function()
   freeze_frame = -1000
+  lag_run = 0
   freeze_at = nil
   wait_until = -1
 end, "freeze-detect-load")
 
 console.log("freeze-detect: 動作中")
 while true do
+  check_lag()
   local now = emu.framecount()
   if now - freeze_frame <= 30 and freeze_at ~= nil then
     gui.text(4, 40, string.format("FREEZE: %s since frame %d", freeze_kind, freeze_at), "red")
