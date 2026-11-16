@@ -30,6 +30,7 @@ end
 local freeze_frame = -1000   -- 最後にフリーズのループを見たフレーム
 local freeze_at = nil        -- フリーズが始まったフレーム
 local freeze_kind = "scroll loop"
+local pause_pending = 0     -- 一時停止は、赤字を画面に出した次のフレームで行う
 local wait_until = -1        -- 長い待ちが終わる予定のフレーム
 local wait_len = 0
 local warned_reg = false
@@ -54,7 +55,7 @@ local function on_scroll_loop()
     freeze_at = now
     freeze_kind = "scroll loop"
     console.log(string.format("freeze-detect: フレーム %d で窓の行送りループ（フリーズ）に入りました。窓の位置 Y=$%02X", now, y))
-    if PAUSE_ON_FREEZE then client.pause() end
+    if PAUSE_ON_FREEZE then pause_pending = 2 end
   end
   freeze_frame = now
 end
@@ -76,7 +77,7 @@ local function on_list_loop()
       freeze_at = now
       freeze_kind = "list loop"
       console.log(string.format("freeze-detect: フレーム %d で選択肢の窓の送りループ（フリーズ）に入りました。$12CC=$%02X", now, memory.read_u8(0x12CC, "WRAM")))
-      if PAUSE_ON_FREEZE then client.pause() end
+      if PAUSE_ON_FREEZE then pause_pending = 2 end
     end
     freeze_frame = now
   end
@@ -109,9 +110,15 @@ console.log("freeze-detect: 動作中")
 while true do
   local now = emu.framecount()
   if now - freeze_frame <= 30 and freeze_at ~= nil then
-    gui.text(4, 20, string.format("FREEZE: %s since frame %d", freeze_kind, freeze_at), "red")
+    gui.text(4, 40, string.format("FREEZE: %s since frame %d", freeze_kind, freeze_at), "red")
   elseif now < wait_until then
     gui.text(4, 20, string.format("LONG WAIT: %d frames left (of %d)", wait_until - now, wait_len), "yellow")
+  end
+  if pause_pending == 1 then
+    pause_pending = 0
+    client.pause()
+  elseif pause_pending == 2 then
+    pause_pending = 1
   end
   emu.frameadvance()
 end
