@@ -63,6 +63,7 @@ event.onloadstate(function() last = nil end, "keep-bright-load")
 ---------------------------------------------------------------- freeze-detect
 local freeze_frame = -1000   -- 最後にフリーズのループを見たフレーム
 local freeze_at = nil        -- フリーズが始まったフレーム
+local freeze_kind = "scroll loop"
 local wait_until = -1        -- 長い待ちが終わる予定のフレーム
 local wait_len = 0
 local warned_reg = false
@@ -85,10 +86,34 @@ local function on_scroll_loop()
   local now = emu.framecount()
   if now - freeze_frame > 30 then
     freeze_at = now
+    freeze_kind = "scroll loop"
     console.log(string.format("freeze-detect: フレーム %d で窓の行送りループ（フリーズ）に入りました。窓の位置 Y=$%02X", now, y))
     if PAUSE_ON_FREEZE then client.pause() end
   end
   freeze_frame = now
+end
+
+-- 選択肢の窓の送りループ：選択位置（$12CC）が見えるところまで一覧を2行ずつ送る処理。
+-- $12CC が $FF などのとき終わらない。このループはフレームを待たずに回り続けるので、
+-- 1フレームの間にループ本体（$00:BD97）を通った回数で判定する（正常なら多くても128回）。
+local list_count = 0
+local list_frame = -1
+local function on_list_loop()
+  local now = emu.framecount()
+  if now ~= list_frame then
+    list_frame = now
+    list_count = 0
+  end
+  list_count = list_count + 1
+  if list_count == 200 then
+    if now - freeze_frame > 30 then
+      freeze_at = now
+      freeze_kind = "list loop"
+      console.log(string.format("freeze-detect: フレーム %d で選択肢の窓の送りループ（フリーズ）に入りました。$12CC=$%02X", now, memory.read_u8(0x12CC, "WRAM")))
+      if PAUSE_ON_FREEZE then client.pause() end
+    end
+    freeze_frame = now
+  end
 end
 
 local function on_wait14()
@@ -108,6 +133,7 @@ if USE_FREEZE_DETECT then
 event.on_bus_exec(on_scroll_loop, 0x00A464, "freeze-detect-a464", BUS)
 event.on_bus_exec(on_scroll_loop, 0x00C75A, "freeze-detect-c75a", BUS)
 event.on_bus_exec(on_wait14, 0x00C6A4, "freeze-detect-c6a4", BUS)
+event.on_bus_exec(on_list_loop, 0x00BD97, "freeze-detect-bd97", BUS)
 end
 event.onloadstate(function()
   freeze_frame = -1000
@@ -135,7 +161,7 @@ while true do
   if USE_FREEZE_DETECT then
     local now = emu.framecount()
     if now - freeze_frame <= 30 and freeze_at ~= nil then
-      gui.text(4, 20, string.format("FREEZE: scroll loop since frame %d", freeze_at), "red")
+      gui.text(4, 20, string.format("FREEZE: %s since frame %d", freeze_kind, freeze_at), "red")
     elseif now < wait_until then
       gui.text(4, 20, string.format("LONG WAIT: %d frames left (of %d)", wait_until - now, wait_len), "yellow")
     end

@@ -5,6 +5,8 @@
 --      窓に文字を書く処理は「行番号が窓の高さ以上なら1行送って行番号を1減らす」を繰り返す。
 --      高さが0の窓を相手にすると終わらない。この間は入力を読まないので、何を押しても進まない。
 --      ループの入口（$00:A464 と $00:C75A）に来たとき、窓の高さ（$1606+Y）が0なら検出とする。
+--   1b) 選択肢の窓の送りループ（フリーズ）
+--      選択位置（$12CC）が見えるまで一覧を送る処理が、$12CC=$FF などのとき終わらない。
 --   2) 命令 14 の長い待ち
 --      命令 14 n は n×2 フレーム待つ。n が 0 のときは約65,000フレーム（約18分）待つ。
 --      LONG_WAIT フレーム以上の待ちが始まったら知らせる。
@@ -27,6 +29,7 @@ end
 
 local freeze_frame = -1000   -- 最後にフリーズのループを見たフレーム
 local freeze_at = nil        -- フリーズが始まったフレーム
+local freeze_kind = "scroll loop"
 local wait_until = -1        -- 長い待ちが終わる予定のフレーム
 local wait_len = 0
 local warned_reg = false
@@ -49,10 +52,34 @@ local function on_scroll_loop()
   local now = emu.framecount()
   if now - freeze_frame > 30 then
     freeze_at = now
+    freeze_kind = "scroll loop"
     console.log(string.format("freeze-detect: フレーム %d で窓の行送りループ（フリーズ）に入りました。窓の位置 Y=$%02X", now, y))
     if PAUSE_ON_FREEZE then client.pause() end
   end
   freeze_frame = now
+end
+
+-- 選択肢の窓の送りループ：選択位置（$12CC）が見えるところまで一覧を2行ずつ送る処理。
+-- $12CC が $FF などのとき終わらない。このループはフレームを待たずに回り続けるので、
+-- 1フレームの間にループ本体（$00:BD97）を通った回数で判定する（正常なら多くても128回）。
+local list_count = 0
+local list_frame = -1
+local function on_list_loop()
+  local now = emu.framecount()
+  if now ~= list_frame then
+    list_frame = now
+    list_count = 0
+  end
+  list_count = list_count + 1
+  if list_count == 200 then
+    if now - freeze_frame > 30 then
+      freeze_at = now
+      freeze_kind = "list loop"
+      console.log(string.format("freeze-detect: フレーム %d で選択肢の窓の送りループ（フリーズ）に入りました。$12CC=$%02X", now, memory.read_u8(0x12CC, "WRAM")))
+      if PAUSE_ON_FREEZE then client.pause() end
+    end
+    freeze_frame = now
+  end
 end
 
 local function on_wait14()
@@ -71,6 +98,7 @@ end
 event.on_bus_exec(on_scroll_loop, 0x00A464, "freeze-detect-a464", BUS)
 event.on_bus_exec(on_scroll_loop, 0x00C75A, "freeze-detect-c75a", BUS)
 event.on_bus_exec(on_wait14, 0x00C6A4, "freeze-detect-c6a4", BUS)
+event.on_bus_exec(on_list_loop, 0x00BD97, "freeze-detect-bd97", BUS)
 event.onloadstate(function()
   freeze_frame = -1000
   freeze_at = nil
@@ -81,7 +109,7 @@ console.log("freeze-detect: 動作中")
 while true do
   local now = emu.framecount()
   if now - freeze_frame <= 30 and freeze_at ~= nil then
-    gui.text(4, 20, string.format("FREEZE: scroll loop since frame %d", freeze_at), "red")
+    gui.text(4, 20, string.format("FREEZE: %s since frame %d", freeze_kind, freeze_at), "red")
   elseif now < wait_until then
     gui.text(4, 20, string.format("LONG WAIT: %d frames left (of %d)", wait_until - now, wait_len), "yellow")
   end
