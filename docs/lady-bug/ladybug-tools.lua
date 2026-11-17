@@ -5,6 +5,9 @@
 --   1行目：MEMO 何枚目 と、その読み取り位置（バンク:番地）
 --   2行目：12枚目のメモの中身（時計と重なっていて毎フレーム変わる）
 --   3行目：IDLE 最後にスクリプトの命令を読んでからのフレーム数（開始直後・ステート読み込み直後は ?）
+--   STACK：CPUのスタックの位置（S）。メモ（スクリプトのしおり）とは別物で、処理の入れ子が深いほど小さくなる。
+--     普段のイベント終了時は $1EE8 付近、バグ発火時は $1D96。STACK_WARN 未満で黄、STACK_DANGER 未満で赤。
+--     $1A00 台まで下がると、ゲームが作業用に使う領域と重なり、ボタンを押しただけで暴走することがある。
 --   12枚目以上を読んでいる間は赤、それ以外は白で表示する。
 --   入力を受け付けているときは、その下に表示する：
 --     INPUT: CHOICE  選択肢の入力待ち（水色）。A・B・←・→で結果が変わる
@@ -33,6 +36,8 @@ local USE_LOG = true             -- メモの枚数と読み取り位置の変�
 local LOG_PATH = "ladybug-log.txt"  -- 記録先。場所を決めたいときは "C:/.../ladybug-log.txt" のように書く
 local LOG_TICK = 600             -- 変化がなくても、このフレーム数ごとに1行書く（0 で書かない）
 local IDLE_WARN = 1800           -- 命令をこのフレーム数読んでいなければ知らせる（IDLE を黄色にし、記録に1行書く）
+local STACK_WARN = 0x1C00        -- CPUのスタック（S）がこれより下がったら STACK を黄色にする
+local STACK_DANGER = 0x1B00      -- これより下がったら赤にし、記録に1行書く（$1A00 台で作業領域と重なった例あり）
 local SHOW_HOLD = false          -- 押しっぱなしのボタンを見ているとき（フィールドの歩行、デモなど）も INPUT: HOLD と出す
 
 local BRIGHT = 0x0F
@@ -294,6 +299,13 @@ local function draw_memo()
     if idle >= IDLE_WARN then idle_color = "yellow" end
     gui.text(4, 92, string.format("IDLE   %d", idle), idle_color)
   end
+  local sp = reg("S")
+  if sp ~= nil then
+    sp = sp % 0x10000
+    local sp_color = "white"
+    if sp < STACK_DANGER then sp_color = "red" elseif sp < STACK_WARN then sp_color = "yellow" end
+    gui.text(4, 156, string.format("STACK  S=$%04X", sp), sp_color)
+  end
 end
 
 ---------------------------------------------------------------- 選択肢待ちの表示
@@ -371,6 +383,7 @@ local log_last_frame = -1000000
 local log_note = nil          -- 次の行に付けるきっかけ（ステート読み込みなど）
 local log_seen_freeze = nil
 local log_seen_nested = nil
+local log_prev_danger = false   -- 前のフレームでスタックが STACK_DANGER 未満だったか
 
 if USE_LOG then
   local err
@@ -404,6 +417,7 @@ local function log_step()
     log_prev_clock = clock
     log_seen_freeze = nil
     log_seen_nested = nil
+    log_prev_danger = false
     return
   end
 
@@ -413,6 +427,12 @@ local function log_step()
     why = string.format("入れ子のままイベント終了 S=%04X", nested_end_s)
   end
   log_seen_nested = nested_end_frame
+  local sp_now = reg("S")
+  local danger = (sp_now ~= nil) and (sp_now % 0x10000 < STACK_DANGER)
+  if why == nil and danger and not log_prev_danger and crash_run == 0 then
+    why = string.format("スタックが深い S=%04X", sp_now % 0x10000)
+  end
+  log_prev_danger = danger
   if why == nil and last_cmd_frame ~= nil and now - last_cmd_frame == IDLE_WARN then
     why = string.format("命令を%dフレーム読んでいない", IDLE_WARN)
   end
