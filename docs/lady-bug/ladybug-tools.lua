@@ -6,6 +6,12 @@
 --   2行目：12枚目のメモの中身（時計と重なっていて毎フレーム変わる）
 --   3行目：IDLE 最後にスクリプトの命令を読んでからのフレーム数（開始直後・ステート読み込み直後は ?）
 --   12枚目以上を読んでいる間は赤、それ以外は白で表示する。
+--   入力を受け付けているときは、その下に表示する：
+--     INPUT: CHOICE  選択肢の入力待ち（水色）。A・B・←・→で結果が変わる
+--     INPUT: PRESS   ボタンを押すのを待っている（会話送り・何か押せば進む待ちなど。命令 46 のように時間で勝手に進む待ちもある）
+--     INPUT: HOLD    押しっぱなしのボタンを見ている（フィールドの歩行など。SHOW_HOLD = true のときだけ）
+--   エンディングに入ったら、入口（40 6F か 40 70）、命令 40 から入ったか命令を読まずに飛んできたか、
+--   その直前に読んだ命令の位置を記録に書き、画面に ENDING と出す。
 -- さらに、メモの動きをファイルに記録する（USE_LOG）。
 --   毎フレームは書かず、次のときだけ1行書く：
 --     ・メモの枚数が変わった
@@ -27,6 +33,7 @@ local USE_LOG = true             -- メモの枚数と読み取り位置の変�
 local LOG_PATH = "ladybug-log.txt"  -- 記録先。場所を決めたいときは "C:/.../ladybug-log.txt" のように書く
 local LOG_TICK = 600             -- 変化がなくても、このフレーム数ごとに1行書く（0 で書かない）
 local IDLE_WARN = 1800           -- 命令をこのフレーム数読んでいなければ知らせる（IDLE を黄色にし、記録に1行書く）
+local SHOW_HOLD = false          -- 押しっぱなしのボタンを見ているとき（フィールドの歩行、デモなど）も INPUT: HOLD と出す
 
 local BRIGHT = 0x0F
 local BRIGHTEN_WHEN_UNKNOWN = true  -- 開始直後・ステート読み込み直後も明るくする
@@ -248,9 +255,27 @@ end
 
 -- 最後にスクリプトの命令を読んでから何フレームたったか（命令の読み出し口 $00:A0A5 を見張る）
 local last_cmd_frame = nil
+-- 直前に読んだ命令の位置を覚えておく（エンディングの入口を記録するため）。
+-- 読み出し口 $00:A0A5 に来たとき、X がいま読んでいるメモの位置（枚数×8）を指している。
+local RECENT_MAX = 12
+local recent = {}
+local function on_cmd_read()
+  local now = emu.framecount()
+  last_cmd_frame = now
+  local x = reg("X")
+  if x == nil then return end
+  local base = 0x129C + (x % 0x100)
+  local lo = memory.read_u8(base, "WRAM")
+  local hi = memory.read_u8(base + 1, "WRAM")
+  local bank = memory.read_u8(base + 2, "WRAM")
+  local addr = bank * 0x10000 + hi * 0x100 + lo
+  local byte = memory.read_u8(addr, BUS)
+  recent[#recent + 1] = string.format("%d:%02X:%02X%02X=%02X", now, bank, hi, lo, byte)
+  if #recent > RECENT_MAX then table.remove(recent, 1) end
+end
 if USE_MEMO_DISPLAY then
-  event.on_bus_exec(function() last_cmd_frame = emu.framecount() end, 0x00A0A5, "ladybug-cmd", BUS)
-  event.onloadstate(function() last_cmd_frame = nil end, "ladybug-cmd-load")
+  event.on_bus_exec(on_cmd_read, 0x00A0A5, "ladybug-cmd", BUS)
+  event.onloadstate(function() last_cmd_frame = nil recent = {} end, "ladybug-cmd-load")
 end
 
 local function draw_memo()
@@ -268,6 +293,68 @@ local function draw_memo()
     local idle_color = "white"
     if idle >= IDLE_WARN then idle_color = "yellow" end
     gui.text(4, 92, string.format("IDLE   %d", idle), idle_color)
+  end
+end
+
+---------------------------------------------------------------- 選択肢待ちの表示
+-- 入力待ちの間、ゲームは共通の「1フレーム待つ」処理で止まっている。
+-- 選択肢の処理（$00:BADA から始まる。$00:B952 から呼ばれる）の中にいるときは、
+-- スタックに戻り先 $B954 が積まれている。これがあれば「選択肢待ち」と表示する。
+-- （ふだんは $BAF9 も積まれているが、カーソルの点滅などで数フレームだけ別の戻り先になるので見ない）
+-- 選択肢待ちでは A（カーソルの行）・B（キャンセル $FF）・←（$FC）・→（$FD）で結果が変わる。
+local USE_CHOICE_DISPLAY = true
+local function in_choice_wait()
+  local sp = reg("S")
+  if sp == nil then return false end
+  sp = sp % 0x10000
+  if sp >= 0x1FA0 then return false end
+  for i = 1, 0x60 do
+    if memory.read_u8(sp + i, "WRAM") == 0x54 and memory.read_u8(sp + i + 1, "WRAM") == 0xB9 then
+      return true
+    end
+  end
+  return false
+end
+-- 入力を受け付けているかどうか。
+-- コントローラーの状態は毎フレーム割り込みの中（$00:82AE〜$00:82E4）で RAM に写される：
+--   $1200〜$1201 = いま押されているボタン、$1202〜$1203 = 新しく押されたボタン。
+-- ゲーム側の処理がこれを読んだフレームは「入力を見ている」とみなす。
+--   ・$1202〜$1203 を読む（会話送り・何か押せば進む待ち・選択肢など、押した瞬間を待つもの）
+--     共通の読み出し口は $00:82F8 と $00:8305。選択肢の処理（$00:BAFC）は直接読む。
+--   ・$1200〜$1201 を割り込みの外で読む（フィールドの歩行、文字送りの早送りなど、押しっぱなしを見るもの）
+local input_new_frame = -1000
+local input_held_frame = -1000
+local function on_pad_new()
+  input_new_frame = emu.framecount()
+end
+local function on_pad_held()
+  local pc = reg("PC")
+  if pc == nil then return end
+  if pc >= 0x0082A0 and pc <= 0x0082F0 then return end  -- 割り込みの中で写しているだけ
+  input_held_frame = emu.framecount()
+end
+if USE_CHOICE_DISPLAY then
+  for _, a in ipairs({0x001202, 0x001203, 0x7E1202, 0x7E1203}) do
+    event.on_bus_read(on_pad_new, a, string.format("ladybug-pad-%06X", a), BUS)
+  end
+  for _, a in ipairs({0x001200, 0x001201, 0x7E1200, 0x7E1201}) do
+    event.on_bus_read(on_pad_held, a, string.format("ladybug-pad-%06X", a), BUS)
+  end
+end
+
+-- 会話の文字を出している途中などは2フレームに1回しか読まないので、3フレーム以内に読んでいれば表示する
+local function draw_choice()
+  local now = emu.framecount()
+  local dn = now - input_new_frame
+  local dh = now - input_held_frame
+  local new_on = dn >= 0 and dn <= 3    -- ステート読み込みや巻き戻しで前後した分は数えない
+  local held_on = dh >= 0 and dh <= 3
+  if new_on and in_choice_wait() then
+    gui.text(4, 124, "INPUT: CHOICE (A / B / LEFT / RIGHT)", "cyan")
+  elseif new_on then
+    gui.text(4, 124, "INPUT: PRESS (wait for button)", "lime")
+  elseif held_on and SHOW_HOLD then
+    gui.text(4, 124, "INPUT: HOLD (held buttons)", "lime")
   end
 end
 
@@ -362,6 +449,34 @@ local function log_step()
   log_prev_clock = clock
 end
 
+---------------------------------------------------------------- エンディングの入口
+-- 40 6F（エピローグから）は $03:800C、40 70（風景とスタッフロールから）は $03:800F へ飛ぶ。
+-- ここに来たら、入口と直前に読んだ命令の位置（フレーム:バンク:番地=読んだ値）を記録とコンソールに出す。
+local ending_frame = nil
+local ending_kind = ""
+local function on_ending(kind)
+  return function()
+    local now = emu.framecount()
+    if ending_frame ~= nil and now - ending_frame >= 0 and now - ending_frame < 60 then return end
+    ending_frame = now
+    ending_kind = kind
+    -- 直前に読んだ命令が 40 でなければ、命令を読まずにここへ飛んできた（暴走など）
+    local via = "命令を読まずに飛んできた（暴走など）"
+    -- 副命令（6F・70）は読み出し口を通らないので、最後に読んだ命令が 40 かどうかで見る
+    local n = #recent
+    if n >= 1 and recent[n]:sub(-2) == "40" then via = "命令 40 から" end
+    local msg = string.format("エンディング開始（%s の入口、%s） 直前に読んだ命令: %s", kind, via, table.concat(recent, " "))
+    console.log("ladybug-tools: フレーム " .. now .. " " .. msg)
+    if log_file ~= nil then
+      log_file:write(string.format("%d\t-\t-\t-\t%s\n", now, msg))
+      log_file:flush()
+    end
+  end
+end
+event.on_bus_exec(on_ending("40 6F"), 0x03800C, "ladybug-end-6f", BUS)
+event.on_bus_exec(on_ending("40 70"), 0x03800F, "ladybug-end-70", BUS)
+event.onloadstate(function() ending_frame = nil end, "ladybug-end-load")
+
 ---------------------------------------------------------------- 毎フレームの処理
 -- 巻き戻し（フレーム番号が前より小さくなった）への対応。
 -- 巻き戻しではステート読み込みの通知が来ないので、ここで検出の状態を捨てる。
@@ -379,6 +494,8 @@ local function check_rewind()
     pause_pending = 0
     nested_end_frame = nil
     last_cmd_frame = nil
+    recent = {}
+    ending_frame = nil
     last = nil
   end
 end
@@ -400,6 +517,7 @@ while true do
     end
   end
   if USE_MEMO_DISPLAY then draw_memo() end
+  if USE_CHOICE_DISPLAY then draw_choice() end
   if USE_FREEZE_DETECT then
     check_crash()
     check_lag()
@@ -408,6 +526,9 @@ while true do
       gui.text(4, 40, string.format("FREEZE: %s since frame %d", freeze_kind, freeze_at), "red")
     elseif now < wait_until then
       gui.text(4, 20, string.format("LONG WAIT: %d frames left (of %d)", wait_until - now, wait_len), "yellow")
+    end
+    if ending_frame ~= nil then
+      gui.text(4, 140, string.format("ENDING (%s) at frame %d", ending_kind, ending_frame), "yellow")
     end
     if nested_end_frame ~= nil then
       gui.text(4, 108, string.format("NESTED END (40 4B) at frame %d  S=%04X", nested_end_frame, nested_end_s), "yellow")
