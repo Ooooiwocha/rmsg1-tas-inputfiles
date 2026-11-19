@@ -2,15 +2,17 @@
 -- keep-bright.lua（暗転中も画面を見えるようにする）と
 -- freeze-detect.lua（フリーズと長い待ちを検出する）を1本にしたもの。
 -- さらに、いま読んでいるメモが何枚目か（スタックの段数）を画面に表示する。
---   1行目：MEMO 何枚目 と、その読み取り位置（バンク:番地）
+--   1行目：MEMO 実際に命令を読んでいるメモが何枚目か と、その読み取り位置（バンク:番地）
+--     命令の読み出し口（$00:A0A5）で最後に使われたメモを表示する。枚数の数字（$129B）ではない。
+--     開始直後・ステート読み込み直後など、まだ命令を読んでいない間だけ、枚数の数字で代用する。
 --   2行目：12枚目のメモの中身（時計と重なっていて毎フレーム変わる）
 --   3行目：IDLE 最後にスクリプトの命令を読んでからのフレーム数（開始直後・ステート読み込み直後は ?）
 --   STACK：CPUのスタックの位置（S）。メモ（スクリプトのしおり）とは別物で、処理の入れ子が深いほど小さくなる。
 --     普段のイベント終了時は $1EE8 付近、バグ発火時は $1D96。STACK_WARN 未満で黄、STACK_DANGER 未満で赤。
 --     $1A00 台まで下がると、ゲームが作業用に使う領域と重なり、ボタンを押しただけで暴走することがある。
 --   12枚目以上を読んでいる間は赤、それ以外は白で表示する。
---   READ：実際に命令を読んだメモが、枚数（$129B）とちがうときだけ出る（橙）。
---     枚数だけが1枚目に戻され、積まれたメモが上から順に読まれ続けることがある。
+--   COUNT：枚数の数字（$129B）が、実際に読んでいるメモとちがうときだけ出る（橙）。
+--     枚数の数字だけが1枚目に戻され、積まれたメモが上から順に読まれ続けることがある。
 --   画面の下のほうに 1〜11枚目の読み取り位置を並べる（SHOW_MEMO_LIST）。
 --     読んでいないメモの読み取り位置が変わったら（命令の作業用の値による上書き）、
 --     そのメモを OVERWRITE_SHOW フレームのあいだ赤で表示し、記録にも1行書く。
@@ -22,12 +24,12 @@
 --   その直前に読んだ命令の位置を記録に書き、画面に ENDING と出す。
 -- さらに、メモの動きをファイルに記録する（USE_LOG）。
 --   毎フレームは書かず、次のときだけ1行書く：
---     ・メモの枚数が変わった
+--     ・読んでいるメモが変わった／枚数の数字（$129B）が変わった
 --     ・読んでいるメモの読み取り位置が変わった
 --     ・12枚目の値が「時計で1フレームに1ずつ減る」以外の変わり方をした
 --     ・ステートを読み込んだ／フリーズを検出した／LOG_TICK フレームたった
 --   巻き戻し中は書かず、進み始めたところで「巻き戻し」と1行書く。
---   列はタブ区切りで、フレーム、何枚目、読み取り位置、12枚目の値、きっかけ。
+--   列はタブ区切りで、フレーム、読んでいるメモ（何枚目）、読み取り位置、12枚目の値、きっかけ。
 -- ロマンシング サガ（日本版）以外のゲームでは何もせずに終了する。
 -- それぞれのしくみは元の2つのファイルの冒頭の説明を参照。
 --
@@ -272,6 +274,7 @@ local last_cmd_frame = nil
 local RECENT_MAX = 12
 local recent = {}
 local read_slots = {}        -- このフレームに命令を読んだメモ（0 が1枚目）
+local last_slot = nil        -- 最後に命令を読んだメモ（0 が1枚目）。まだ読んでいなければ nil
 local mismatch_slot = nil    -- 最後に読んだメモが枚数とちがっていたら、そのメモ（0 が1枚目）
 local mismatch_frame = -1000
 -- 1〜11枚目の読み取り位置の見張り。読んでいないのに変わったら上書きとみなす。
@@ -284,6 +287,7 @@ local function reset_memo_watch()
   overwrite_notes = {}
   read_slots = {}
   mismatch_slot = nil
+  last_slot = nil
 end
 local function on_cmd_read()
   local now = emu.framecount()
@@ -293,6 +297,7 @@ local function on_cmd_read()
   -- 実際に読んでいるメモ（X÷8）。枚数（$129B）とちがっていたら覚えておく
   local slot = math.floor((x % 0x100) / 8)
   read_slots[slot] = true
+  last_slot = slot
   if slot ~= memory.read_u8(0x129B, "WRAM") then
     mismatch_slot = slot
     mismatch_frame = now
@@ -321,7 +326,7 @@ local function watch_memos()
     local cur = memo_ptr(i)
     local old = memo_prev[i]
     -- 読んでいるメモ・このフレームに読んだメモ・その1つ上（呼び出しで新しく作られる）は普通に変わる
-    if old ~= nil and cur ~= old and i ~= depth and i ~= depth + 1 and i ~= mismatch_slot
+    if old ~= nil and cur ~= old and i ~= depth and i ~= depth + 1 and i ~= mismatch_slot and i ~= last_slot
        and not read_slots[i] and not read_slots[i - 1] then
       memo_hit[i] = now
       overwrite_notes[#overwrite_notes + 1] = string.format("%d枚目 %s→%s", i + 1, old, cur)
@@ -344,11 +349,15 @@ end
 
 local function draw_memo()
   local depth = memory.read_u8(0x129B, "WRAM")
+  local cur = last_slot or depth   -- 実際に読んでいるメモ（分からない間は枚数の数字）
   local color = "white"
-  if depth >= 11 then color = "red" end
+  if cur >= 11 then color = "red" end
   local where = "--:----"
-  if depth < 16 then where = memo_ptr(depth) end
-  gui.text(4, 60, string.format("MEMO %d  %s", depth + 1, where), color)
+  if cur < 16 then where = memo_ptr(cur) end
+  gui.text(4, 60, string.format("MEMO %d  %s", cur + 1, where), color)
+  if cur ~= depth then
+    gui.text(200, 60, string.format("COUNT %d", depth + 1), "orange")
+  end
   gui.text(4, 76, string.format("12th   %s", memo_ptr(11)), color)
   if last_cmd_frame == nil then
     gui.text(4, 92, "IDLE   ?", "white")
@@ -364,11 +373,6 @@ local function draw_memo()
     local sp_color = "white"
     if sp < STACK_DANGER then sp_color = "red" elseif sp < STACK_WARN then sp_color = "yellow" end
     gui.text(4, 156, string.format("STACK  S=$%04X", sp), sp_color)
-  end
-  -- 実際に読んだメモが枚数とちがうとき（最後に読んでから60フレーム以内）
-  local dm = emu.framecount() - mismatch_frame
-  if mismatch_slot ~= nil and dm >= 0 and dm <= 60 then
-    gui.text(200, 60, string.format("READ %d  %s", mismatch_slot + 1, memo_ptr(mismatch_slot)), "orange")
   end
   if SHOW_MEMO_LIST then draw_memo_list() end
 end
@@ -441,6 +445,7 @@ local rewinding = false   -- このフレームが巻き戻しで来たものか
 ---------------------------------------------------------------- 記録
 local log_file = nil
 local log_prev_depth = nil
+local log_prev_cur = nil
 local log_prev_ptr = nil
 local log_prev_lo = nil
 local log_prev_clock = nil
@@ -458,7 +463,7 @@ if USE_LOG then
     console.log("ladybug-tools: 記録ファイルを開けません（" .. tostring(err) .. "）。記録なしで続けます。")
   else
     log_file:write(string.format("# ladybug-tools 記録開始 フレーム %d\n", emu.framecount()))
-    log_file:write("# フレーム\t何枚目\t読み取り位置\t12枚目\tきっかけ\n")
+    log_file:write("# フレーム\t読んでいるメモ\t読み取り位置\t12枚目\tきっかけ\n")
     log_file:flush()
     event.onloadstate(function() log_note = "ステート読み込み" end, "ladybug-log-load")
     event.onexit(function() if log_file ~= nil then log_file:close() log_file = nil end end, "ladybug-log-exit")
@@ -469,8 +474,9 @@ local function log_step()
   if log_file == nil then return end
   local now = emu.framecount()
   local depth = memory.read_u8(0x129B, "WRAM")
+  local cur = last_slot or depth
   local ptr = "--:----"
-  if depth < 16 then ptr = memo_ptr(depth) end
+  if cur < 16 then ptr = memo_ptr(cur) end
   local lo = memory.read_u8(0x12F4, "WRAM")
   local clock = memory.read_u8(0x12F5, "WRAM") + memory.read_u8(0x12F6, "WRAM") * 256
 
@@ -478,6 +484,7 @@ local function log_step()
   if rewinding then
     log_note = "巻き戻し"
     log_prev_depth = depth
+    log_prev_cur = cur
     log_prev_ptr = ptr
     log_prev_lo = lo
     log_prev_clock = clock
@@ -507,7 +514,7 @@ local function log_step()
   end
   if mismatch_slot ~= log_prev_mismatch then
     if why == nil and mismatch_slot ~= nil then
-      why = string.format("枚数とちがうメモを読んだ（%d枚目 %s）", mismatch_slot + 1, memo_ptr(mismatch_slot))
+      why = string.format("枚数の数字（%d）とちがうメモを読んだ（%d枚目 %s）", depth + 1, mismatch_slot + 1, memo_ptr(mismatch_slot))
     end
     log_prev_mismatch = mismatch_slot
   end
@@ -521,14 +528,16 @@ local function log_step()
   if why == nil then
     if log_prev_depth == nil then
       why = "開始"
+    elseif cur ~= log_prev_cur then
+      why = "読むメモ"
     elseif depth ~= log_prev_depth then
-      why = "枚数"
+      why = string.format("枚数の数字 %d", depth + 1)
     else
       -- 12枚目は時計で1フレームに1ずつ減るのが普通。それ以外の変わり方だけを拾う
       local clock_ok = (lo == log_prev_lo) and (clock == (log_prev_clock - 1) % 0x10000 or clock == log_prev_clock)
       if not clock_ok then
         why = "12枚目"
-      elseif depth ~= 11 and ptr ~= log_prev_ptr then
+      elseif cur ~= 11 and ptr ~= log_prev_ptr then
         why = "位置"
       elseif LOG_TICK > 0 and now - log_last_frame >= LOG_TICK then
         why = "定期"
@@ -537,11 +546,12 @@ local function log_step()
   end
 
   if why ~= nil then
-    log_file:write(string.format("%d\t%d\t%s\t%s\t%s\n", now, depth + 1, ptr, memo_ptr(11), why))
+    log_file:write(string.format("%d\t%d\t%s\t%s\t%s\n", now, cur + 1, ptr, memo_ptr(11), why))
     log_file:flush()
     log_last_frame = now
   end
   log_prev_depth = depth
+  log_prev_cur = cur
   log_prev_ptr = ptr
   log_prev_lo = lo
   log_prev_clock = clock
