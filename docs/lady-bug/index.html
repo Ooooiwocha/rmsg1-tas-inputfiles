@@ -86,6 +86,7 @@ ol.steps{margin:0;padding:0}
 .slot span:first-child{width:4em;flex:none;white-space:nowrap}
 .slot .ad{flex:none;width:3.4em;font-size:11.5px;color:var(--muted)}
 .slot.s11 .ad{color:inherit}
+.slot .wk{flex:none;margin-left:auto;font-size:11px;color:var(--count);border:1px solid var(--count);border-radius:3px;padding:0 5px;white-space:nowrap;background:var(--bg)}
 .slot.on{border-style:solid;border-color:var(--accent);color:var(--ink);background:var(--win)}
 .slot.top{border-color:var(--bank2)}
 .slot.s11{border-color:var(--count);color:var(--count)}
@@ -217,7 +218,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
           <button id="btnReset">最初から</button>
           <span class="mono small muted" id="stackCount"></span>
         </div>
-        <p class="small muted">メモは1枚8バイトで、メモリの <span class="mono">$129C</span> から順に並びます。各段の横の番地が、そのメモの先頭です。メモは1枚目から数えています。ゲーム内部で入れ子の深さを表す変数（<span class="mono">$129B</span>）は0から数えるので、12枚目のときの値は11です。12枚目は <span class="mono">$12F4</span> からで、その2・3バイト目（<span class="mono">$12F5</span>・<span class="mono">$12F6</span>）がプレイ時間カウンタと重なります。置ける枚数に上限の確認はありません。</p>
+        <p class="small muted">メモは1枚8バイトで、メモリの <span class="mono">$129C</span> から順に並びます。各段の横の番地が、そのメモの先頭です。メモは1枚目から数えています。ゲーム内部で入れ子の深さを表す変数（<span class="mono">$129B</span>）は0から数えるので、12枚目のときの値は11です。12枚目は <span class="mono">$12F4</span> からで、その2・3バイト目（<span class="mono">$12F5</span>・<span class="mono">$12F6</span>）がプレイ時間カウンタと重なります。置ける枚数に上限の確認はありません。<b class="cnt">「作業用と共用」</b>の印がある7〜11枚目の場所は、命令を処理するプログラムが計算の途中の値を一時的に置く場所でもあります。普段はメモが7枚も積まれないので、ぶつかりません（くわしくは「補足 ／ メモの裏側」）。</p>
       </div>
     </div>
     <figcaption>「追い返される」を押すと、1回ぶん進みます。実際の記録でも、10回目のあとは1〜10枚目がすべてスクリプト0x2E8の「捨てる命令の直前」を指していました。</figcaption>
@@ -703,7 +704,9 @@ function drawStack(){
     else if(i===10&&over){d.classList.add('on','top');t='スクリプト0x173（船で去る途中）'}
     if(i===11){t=over?'スクリプト0x194 ← 時計と同じ場所！':'ここは時計（プレイ時間カウンタ）の場所'; if(over)d.classList.add('on')}
     if(i===n&&n===0){t=''}
-    d.innerHTML='<span>'+(i+1)+'枚目</span><span class="ad">$'+hex(0x129C+8*i,4)+'</span><span>'+t+'</span>';stack.appendChild(d);
+    /* 7〜11枚目の置き場所は、命令の処理が計算の途中の値を置く場所としても使う */
+    const wk=(i>=6&&i<=10)?'<span class="wk">作業用と共用</span>':'';
+    d.innerHTML='<span>'+(i+1)+'枚目</span><span class="ad">$'+hex(0x129C+8*i,4)+'</span><span>'+t+'</span>'+wk;stack.appendChild(d);
   }
   cnt.textContent='追い返し '+n+' 回';
   bPush.disabled=over;
