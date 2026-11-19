@@ -5,6 +5,8 @@
 --   1行目：MEMO 実際に命令を読んでいるメモが何枚目か と、その読み取り位置（バンク:番地）
 --     命令の読み出し口（$00:A0A5）で最後に使われたメモを表示する。枚数の数字（$129B）ではない。
 --     開始直後・ステート読み込み直後など、まだ命令を読んでいない間だけ、枚数の数字で代用する。
+--     > の右は、そのメモの終了位置。13枚目より先（MEMO 34 など、メモの置き場所の外）を読んでいるときも、
+--     その場所の中身をそのまま出し、一覧の下に赤で知らせる。
 --   2行目：12枚目のメモの中身（時計と重なっていて毎フレーム変わる）
 --   3行目：IDLE 最後にスクリプトの命令を読んでからのフレーム数（開始直後・ステート読み込み直後は ?）
 --   STACK：CPUのスタックの位置（S）。メモ（スクリプトのしおり）とは別物で、処理の入れ子が深いほど小さくなる。
@@ -307,7 +309,8 @@ local function on_cmd_read()
   local x = reg("X")
   if x == nil then return end
   -- 実際に読んでいるメモ（X÷8）。枚数（$129B）とちがっていたら覚えておく
-  local slot = math.floor((x % 0x100) / 8)
+  -- X は16ビット。枚数の数字が壊れると、13枚目より先（メモの置き場所の外）を指すこともある
+  local slot = math.floor((x % 0x10000) / 8)
   read_slots[slot] = true
   last_slot = slot
   if slot ~= memory.read_u8(0x129B, "WRAM") then
@@ -316,7 +319,7 @@ local function on_cmd_read()
   else
     mismatch_slot = nil
   end
-  local base = 0x129C + (x % 0x100)
+  local base = 0x129C + (x % 0x10000)
   local lo = memory.read_u8(base, "WRAM")
   local hi = memory.read_u8(base + 1, "WRAM")
   local bank = memory.read_u8(base + 2, "WRAM")
@@ -377,11 +380,13 @@ local function draw_memo()
   local cur = last_slot or depth   -- 実際に読んでいるメモ（分からない間は枚数の数字）
   local color = "white"
   if cur >= 11 then color = "red" end
-  local where = "--:----"
-  if cur < 16 then where = memo_ptr(cur) end
-  gui.text(4, 60, string.format("MEMO %d  %s", cur + 1, where), color)
+  -- 13枚目より先（一覧にない場所）を読んでいるときも、その場所の中身をそのまま出す
+  gui.text(4, 60, string.format("MEMO %d  %s >%s", cur + 1, memo_ptr(cur), memo_end(cur)), color)
   if cur ~= depth then
-    gui.text(200, 60, string.format("COUNT %d", depth + 1), "orange")
+    gui.text(260, 60, string.format("COUNT %d", depth + 1), "orange")
+  end
+  if cur >= 12 then
+    gui.text(4, 268, string.format("MEMO %d is outside the memo area ($%04X)", cur + 1, 0x129C + cur * 8), "red")
   end
   gui.text(4, 76, string.format("12th   %s >%s", memo_ptr(11), memo_end(11)), color)
   if last_cmd_frame == nil then
@@ -500,8 +505,7 @@ local function log_step()
   local now = emu.framecount()
   local depth = memory.read_u8(0x129B, "WRAM")
   local cur = last_slot or depth
-  local ptr = "--:----"
-  if cur < 16 then ptr = memo_ptr(cur) end
+  local ptr = memo_ptr(cur)
   local lo = memory.read_u8(0x12F4, "WRAM")
   local clock = memory.read_u8(0x12F5, "WRAM") + memory.read_u8(0x12F6, "WRAM") * 256
 
