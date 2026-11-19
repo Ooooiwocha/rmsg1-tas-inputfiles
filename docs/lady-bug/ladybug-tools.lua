@@ -9,6 +9,11 @@
 --     普段のイベント終了時は $1EE8 付近、バグ発火時は $1D96。STACK_WARN 未満で黄、STACK_DANGER 未満で赤。
 --     $1A00 台まで下がると、ゲームが作業用に使う領域と重なり、ボタンを押しただけで暴走することがある。
 --   12枚目以上を読んでいる間は赤、それ以外は白で表示する。
+--   READ：実際に命令を読んだメモが、枚数（$129B）とちがうときだけ出る（橙）。
+--     枚数だけが1枚目に戻され、積まれたメモが上から順に読まれ続けることがある。
+--   画面の下のほうに 1〜11枚目の読み取り位置を並べる（SHOW_MEMO_LIST）。
+--     読んでいないメモの読み取り位置が変わったら（命令の作業用の値による上書き）、
+--     そのメモを OVERWRITE_SHOW フレームのあいだ赤で表示し、記録にも1行書く。
 --   入力を受け付けているときは、その下に表示する：
 --     INPUT: CHOICE  選択肢の入力待ち（水色）。A・B・←・→で結果が変わる
 --     INPUT: PRESS   ボタンを押すのを待っている（会話送り・何か押せば進む待ちなど。命令 46 のように時間で勝手に進む待ちもある）
@@ -38,6 +43,8 @@ local LOG_TICK = 600             -- 変化がなくても、このフレーム�
 local IDLE_WARN = 1800           -- 命令をこのフレーム数読んでいなければ知らせる（IDLE を黄色にし、記録に1行書く）
 local STACK_WARN = 0x1C00        -- CPUのスタック（S）がこれより下がったら STACK を黄色にする
 local STACK_DANGER = 0x1B00      -- これより下がったら赤にし、記録に1行書く（$1A00 台で作業領域と重なった例あり）
+local SHOW_MEMO_LIST = true      -- 1〜11枚目の読み取り位置を並べて表示し、上書きを見張る
+local OVERWRITE_SHOW = 300       -- 上書きされたメモを赤で表示しておくフレーム数
 local SHOW_HOLD = false          -- 押しっぱなしのボタンを見ているとき（フィールドの歩行、デモなど）も INPUT: HOLD と出す
 
 local BRIGHT = 0x0F
@@ -264,11 +271,34 @@ local last_cmd_frame = nil
 -- 読み出し口 $00:A0A5 に来たとき、X がいま読んでいるメモの位置（枚数×8）を指している。
 local RECENT_MAX = 12
 local recent = {}
+local read_slots = {}        -- このフレームに命令を読んだメモ（0 が1枚目）
+local mismatch_slot = nil    -- 最後に読んだメモが枚数とちがっていたら、そのメモ（0 が1枚目）
+local mismatch_frame = -1000
+-- 1〜11枚目の読み取り位置の見張り。読んでいないのに変わったら上書きとみなす。
+local memo_prev = {}         -- 前のフレームの読み取り位置（文字列）
+local memo_hit = {}          -- 上書きを見つけたフレーム
+local overwrite_notes = {}   -- 記録に書く上書きの内容
+local function reset_memo_watch()
+  memo_prev = {}
+  memo_hit = {}
+  overwrite_notes = {}
+  read_slots = {}
+  mismatch_slot = nil
+end
 local function on_cmd_read()
   local now = emu.framecount()
   last_cmd_frame = now
   local x = reg("X")
   if x == nil then return end
+  -- 実際に読んでいるメモ（X÷8）。枚数（$129B）とちがっていたら覚えておく
+  local slot = math.floor((x % 0x100) / 8)
+  read_slots[slot] = true
+  if slot ~= memory.read_u8(0x129B, "WRAM") then
+    mismatch_slot = slot
+    mismatch_frame = now
+  else
+    mismatch_slot = nil
+  end
   local base = 0x129C + (x % 0x100)
   local lo = memory.read_u8(base, "WRAM")
   local hi = memory.read_u8(base + 1, "WRAM")
@@ -280,7 +310,36 @@ local function on_cmd_read()
 end
 if USE_MEMO_DISPLAY then
   event.on_bus_exec(on_cmd_read, 0x00A0A5, "ladybug-cmd", BUS)
-  event.onloadstate(function() last_cmd_frame = nil recent = {} end, "ladybug-cmd-load")
+  event.onloadstate(function() last_cmd_frame = nil recent = {} reset_memo_watch() end, "ladybug-cmd-load")
+end
+
+-- 1〜11枚目の読み取り位置を前のフレームと比べる。毎フレーム1回呼ぶ。
+local function watch_memos()
+  local now = emu.framecount()
+  local depth = memory.read_u8(0x129B, "WRAM")
+  for i = 0, 10 do
+    local cur = memo_ptr(i)
+    local old = memo_prev[i]
+    -- 読んでいるメモ・このフレームに読んだメモ・その1つ上（呼び出しで新しく作られる）は普通に変わる
+    if old ~= nil and cur ~= old and i ~= depth and i ~= depth + 1 and i ~= mismatch_slot
+       and not read_slots[i] and not read_slots[i - 1] then
+      memo_hit[i] = now
+      overwrite_notes[#overwrite_notes + 1] = string.format("%d枚目 %s→%s", i + 1, old, cur)
+      console.log(string.format("ladybug-tools: フレーム %d で %d枚目のメモが上書きされました（%s → %s）。", now, i + 1, old, cur))
+    end
+    memo_prev[i] = cur
+  end
+  read_slots = {}
+end
+
+local function draw_memo_list()
+  local now = emu.framecount()
+  for i = 0, 10 do
+    local color = "white"
+    local d = memo_hit[i] and (now - memo_hit[i]) or nil
+    if d ~= nil and d >= 0 and d <= OVERWRITE_SHOW then color = "red" end
+    gui.text(4 + (i % 3) * 130, 172 + math.floor(i / 3) * 16, string.format("%2d %s", i + 1, memo_ptr(i)), color)
+  end
 end
 
 local function draw_memo()
@@ -306,6 +365,12 @@ local function draw_memo()
     if sp < STACK_DANGER then sp_color = "red" elseif sp < STACK_WARN then sp_color = "yellow" end
     gui.text(4, 156, string.format("STACK  S=$%04X", sp), sp_color)
   end
+  -- 実際に読んだメモが枚数とちがうとき（最後に読んでから60フレーム以内）
+  local dm = emu.framecount() - mismatch_frame
+  if mismatch_slot ~= nil and dm >= 0 and dm <= 60 then
+    gui.text(200, 60, string.format("READ %d  %s", mismatch_slot + 1, memo_ptr(mismatch_slot)), "orange")
+  end
+  if SHOW_MEMO_LIST then draw_memo_list() end
 end
 
 ---------------------------------------------------------------- 選択肢待ちの表示
@@ -384,6 +449,7 @@ local log_note = nil          -- 次の行に付けるきっかけ（ステー�
 local log_seen_freeze = nil
 local log_seen_nested = nil
 local log_prev_danger = false   -- 前のフレームでスタックが STACK_DANGER 未満だったか
+local log_prev_mismatch = nil   -- 前に記録した「枚数とちがうメモ」
 
 if USE_LOG then
   local err
@@ -418,6 +484,8 @@ local function log_step()
     log_seen_freeze = nil
     log_seen_nested = nil
     log_prev_danger = false
+    log_prev_mismatch = nil
+    overwrite_notes = {}
     return
   end
 
@@ -433,6 +501,16 @@ local function log_step()
     why = string.format("スタックが深い S=%04X", sp_now % 0x10000)
   end
   log_prev_danger = danger
+  if #overwrite_notes > 0 then
+    if why == nil then why = "メモ上書き " .. table.concat(overwrite_notes, " ") end
+    overwrite_notes = {}
+  end
+  if mismatch_slot ~= log_prev_mismatch then
+    if why == nil and mismatch_slot ~= nil then
+      why = string.format("枚数とちがうメモを読んだ（%d枚目 %s）", mismatch_slot + 1, memo_ptr(mismatch_slot))
+    end
+    log_prev_mismatch = mismatch_slot
+  end
   if why == nil and last_cmd_frame ~= nil and now - last_cmd_frame == IDLE_WARN then
     why = string.format("命令を%dフレーム読んでいない", IDLE_WARN)
   end
@@ -515,6 +593,7 @@ local function check_rewind()
     nested_end_frame = nil
     last_cmd_frame = nil
     recent = {}
+    reset_memo_watch()
     ending_frame = nil
     last = nil
   end
@@ -536,7 +615,10 @@ while true do
       mine = false
     end
   end
-  if USE_MEMO_DISPLAY then draw_memo() end
+  if USE_MEMO_DISPLAY then
+    if SHOW_MEMO_LIST and not rewinding then watch_memos() end
+    draw_memo()
+  end
   if USE_CHOICE_DISPLAY then draw_choice() end
   if USE_FREEZE_DETECT then
     check_crash()
