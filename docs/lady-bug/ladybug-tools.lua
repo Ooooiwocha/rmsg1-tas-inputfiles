@@ -13,8 +13,10 @@
 --   12枚目以上を読んでいる間は赤、それ以外は白で表示する。
 --   COUNT：枚数の数字（$129B）が、実際に読んでいるメモとちがうときだけ出る（橙）。
 --     枚数の数字だけが1枚目に戻され、積まれたメモが上から順に読まれ続けることがある。
---   画面の下のほうに 1〜11枚目の読み取り位置を並べる（SHOW_MEMO_LIST）。
---     読んでいないメモの読み取り位置が変わったら（命令の作業用の値による上書き）、
+--   画面の下のほうに 1〜11枚目の読み取り位置と終了位置を並べる（SHOW_MEMO_LIST）。
+--     「枚目 バンク:読み取り位置 >終了位置」の形。終了位置は、読み取り位置がここにぴったり重なったら
+--     スクリプトが終わる、という目印（メモの4〜5バイト目）。
+--     読んでいないメモの読み取り位置か終了位置が変わったら（命令の作業用の値による上書き）、
 --     そのメモを OVERWRITE_SHOW フレームのあいだ赤で表示し、記録にも1行書く。
 --   入力を受け付けているときは、その下に表示する：
 --     INPUT: CHOICE  選択肢の入力待ち（水色）。A・B・←・→で結果が変わる
@@ -267,6 +269,12 @@ local function memo_ptr(index)
   return string.format("%02X:%02X%02X", bank, hi, lo)
 end
 
+-- メモの終了位置（4〜5バイト目。下位、上位）
+local function memo_end(index)
+  local base = 0x129C + index * 8
+  return string.format("%02X%02X", memory.read_u8(base + 4, "WRAM"), memory.read_u8(base + 3, "WRAM"))
+end
+
 -- 最後にスクリプトの命令を読んでから何フレームたったか（命令の読み出し口 $00:A0A5 を見張る）
 local last_cmd_frame = nil
 -- 直前に読んだ命令の位置を覚えておく（エンディングの入口を記録するため）。
@@ -279,10 +287,14 @@ local mismatch_slot = nil    -- 最後に読んだメモが枚数とちがって
 local mismatch_frame = -1000
 -- 1〜11枚目の読み取り位置の見張り。読んでいないのに変わったら上書きとみなす。
 local memo_prev = {}         -- 前のフレームの読み取り位置（文字列）
+local memo_prev_end = {}     -- 前のフレームの終了位置（文字列）
 local memo_hit = {}          -- 上書きを見つけたフレーム
+local memo_end_logged = {}   -- 終了位置の上書きを最後に書き出したフレーム
 local overwrite_notes = {}   -- 記録に書く上書きの内容
 local function reset_memo_watch()
   memo_prev = {}
+  memo_prev_end = {}
+  memo_end_logged = {}
   memo_hit = {}
   overwrite_notes = {}
   read_slots = {}
@@ -325,14 +337,27 @@ local function watch_memos()
   for i = 0, 10 do
     local cur = memo_ptr(i)
     local old = memo_prev[i]
+    local cur_end = memo_end(i)
+    local old_end = memo_prev_end[i]
     -- 読んでいるメモ・このフレームに読んだメモ・その1つ上（呼び出しで新しく作られる）は普通に変わる
-    if old ~= nil and cur ~= old and i ~= depth and i ~= depth + 1 and i ~= mismatch_slot and i ~= last_slot
-       and not read_slots[i] and not read_slots[i - 1] then
+    -- 見張るのは、いま読んでいるメモより下のメモだけ（上のメモは使われていないので、変わっても害がない）
+    local idle = i < (last_slot or depth) and i ~= depth and i ~= depth + 1 and i ~= mismatch_slot
+       and not read_slots[i] and not read_slots[i - 1]
+    if idle and old ~= nil and cur ~= old then
       memo_hit[i] = now
       overwrite_notes[#overwrite_notes + 1] = string.format("%d枚目 %s→%s", i + 1, old, cur)
       console.log(string.format("ladybug-tools: フレーム %d で %d枚目のメモが上書きされました（%s → %s）。", now, i + 1, old, cur))
     end
+    -- 待ちのカウンタと重なると毎フレーム変わるので、書き出しは同じメモにつき60フレームに1回まで
+    if idle and old_end ~= nil and cur_end ~= old_end then memo_hit[i] = now end
+    local quiet = memo_end_logged[i] ~= nil and now - memo_end_logged[i] >= 0 and now - memo_end_logged[i] < 60
+    if idle and old_end ~= nil and cur_end ~= old_end and not quiet then
+      memo_end_logged[i] = now
+      overwrite_notes[#overwrite_notes + 1] = string.format("%d枚目 終了位置 %s→%s", i + 1, old_end, cur_end)
+      console.log(string.format("ladybug-tools: フレーム %d で %d枚目のメモの終了位置が上書きされました（%s → %s）。", now, i + 1, old_end, cur_end))
+    end
     memo_prev[i] = cur
+    memo_prev_end[i] = cur_end
   end
   read_slots = {}
 end
@@ -343,7 +368,7 @@ local function draw_memo_list()
     local color = "white"
     local d = memo_hit[i] and (now - memo_hit[i]) or nil
     if d ~= nil and d >= 0 and d <= OVERWRITE_SHOW then color = "red" end
-    gui.text(4 + (i % 3) * 130, 172 + math.floor(i / 3) * 16, string.format("%2d %s", i + 1, memo_ptr(i)), color)
+    gui.text(4 + (i % 2) * 190, 172 + math.floor(i / 2) * 16, string.format("%2d %s >%s", i + 1, memo_ptr(i), memo_end(i)), color)
   end
 end
 
@@ -358,7 +383,7 @@ local function draw_memo()
   if cur ~= depth then
     gui.text(200, 60, string.format("COUNT %d", depth + 1), "orange")
   end
-  gui.text(4, 76, string.format("12th   %s", memo_ptr(11)), color)
+  gui.text(4, 76, string.format("12th   %s >%s", memo_ptr(11), memo_end(11)), color)
   if last_cmd_frame == nil then
     gui.text(4, 92, "IDLE   ?", "white")
   else
