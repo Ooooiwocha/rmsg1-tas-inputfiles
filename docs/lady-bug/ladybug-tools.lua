@@ -13,6 +13,12 @@
 --     普段のイベント終了時は $1EE8 付近、バグ発火時は $1D96。STACK_WARN 未満で黄、STACK_DANGER 未満で赤。
 --     $1A00 台まで下がると、ゲームが作業用に使う領域と重なり、ボタンを押しただけで暴走することがある。
 --   12枚目以上を読んでいる間は赤、それ以外は白で表示する。
+--   NEXT：このあと読むメモの順番。スクリプトを読む処理は入れ子で呼び出されていて（港で追い返されるたびに1段増える）、
+--     外側の段はそれぞれ「自分が読んでいたメモの位置」をCPUのスタックに取ってある。
+--     内側の段が終わると、外側の段が取っておいたメモに切り替わる（枚数の数字は見ない）。
+--     左端が次に戻る段のメモ、右端がいちばん外側の段。かっこの中は残っている段数。
+--     NEXT_SHOW 個まで表示し、残りは ... にする。段数が変わったら、全部をコンソールと記録に書く。
+--     入れ子がなければ - 、ステート読み込み直後でまだ分からないときは ? を付ける。
 --   COUNT：枚数の数字（$129B）が、実際に読んでいるメモとちがうときだけ出る（橙）。
 --     枚数の数字だけが1枚目に戻され、積まれたメモが上から順に読まれ続けることがある。
 --   画面の下のほうに 1〜11枚目の読み取り位置と終了位置を並べる（SHOW_MEMO_LIST）。
@@ -51,6 +57,7 @@ local STACK_WARN = 0x1C00        -- CPUのスタック（S）がこれより下�
 local STACK_DANGER = 0x1B00      -- これより下がったら赤にし、記録に1行書く（$1A00 台で作業領域と重なった例あり）
 local SHOW_MEMO_LIST = true      -- 1〜11枚目の読み取り位置を並べて表示し、上書きを見張る
 local OVERWRITE_SHOW = 300       -- 上書きされたメモを赤で表示しておくフレーム数
+local NEXT_SHOW = 8              -- NEXT に並べるメモの数（残りは ... にする）
 local SHOW_HOLD = false          -- 押しっぱなしのボタンを見ているとき（フィールドの歩行、デモなど）も INPUT: HOLD と出す
 
 local BRIGHT = 0x0F
@@ -285,6 +292,7 @@ local RECENT_MAX = 12
 local recent = {}
 local read_slots = {}        -- このフレームに命令を読んだメモ（0 が1枚目）
 local last_slot = nil        -- 最後に命令を読んだメモ（0 が1枚目）。まだ読んでいなければ nil
+local last_read_s = nil      -- 最後に命令を読んだときのCPUのスタックの位置（S）
 local mismatch_slot = nil    -- 最後に読んだメモが枚数とちがっていたら、そのメモ（0 が1枚目）
 local mismatch_frame = -1000
 -- 1〜11枚目の読み取り位置の見張り。読んでいないのに変わったら上書きとみなす。
@@ -302,6 +310,7 @@ local function reset_memo_watch()
   read_slots = {}
   mismatch_slot = nil
   last_slot = nil
+  last_read_s = nil
 end
 local function on_cmd_read()
   local now = emu.framecount()
@@ -313,6 +322,8 @@ local function on_cmd_read()
   local slot = math.floor((x % 0x10000) / 8)
   read_slots[slot] = true
   last_slot = slot
+  local s_now = reg("S")
+  if s_now ~= nil then last_read_s = s_now % 0x10000 end
   if slot ~= memory.read_u8(0x129B, "WRAM") then
     mismatch_slot = slot
     mismatch_frame = now
@@ -365,13 +376,80 @@ local function watch_memos()
   read_slots = {}
 end
 
+-- 外側の段が取ってあるメモの位置を、CPUのスタックから拾う。
+-- 目印：スタックに「メモの位置（枚数×8、2バイト）」があり、そのすぐ上に戻り先 AF 9F（$00:9FAF）が積まれている。
+-- いま読んでいる段より上（番地が大きいほう）だけを見るので、返すのは外側の段だけ。内側から順に並ぶ。
+-- 2つ目の戻り値は、どこからが外側か分かっているかどうか（ステート読み込み直後は分からない）。
+local STACK_TOP = 0x1FFF
+local function next_memos()
+  local sp = reg("S")
+  if sp == nil then return nil, false end
+  sp = sp % 0x10000
+  local from = sp
+  local sure = (last_read_s ~= nil)
+  if sure and last_read_s > from then from = last_read_s end
+  from = from + 1
+  if from < 0x1C00 then from = 0x1C00 end
+  local list = {}
+  if from > STACK_TOP - 3 then return list, sure end
+  local n = STACK_TOP - from + 1
+  local ok, t = pcall(memory.read_bytes_as_array, from, n, "WRAM")
+  local function at(i)   -- i は 0 始まり
+    if ok and t ~= nil then
+      if t[0] ~= nil then return t[i] end
+      return t[i + 1]
+    end
+    return memory.read_u8(from + i, "WRAM")
+  end
+  for i = 0, n - 4 do
+    if at(i + 2) == 0xAF and at(i + 3) == 0x9F then
+      local v = at(i) + at(i + 1) * 256
+      if v % 8 == 0 and v < 0x800 then list[#list + 1] = math.floor(v / 8) end
+    end
+  end
+  return list, sure
+end
+
+local next_prev_count = nil
+local next_note = nil        -- 記録に書く内容（段数が変わったとき）
+local function draw_next()
+  local list, sure = next_memos()
+  if list == nil then return end
+  local color = "white"
+  local parts = {}
+  local all = {}
+  for i, slot in ipairs(list) do
+    if slot >= 11 then color = "red" end
+    all[#all + 1] = string.format("%d", slot + 1)
+    if i <= NEXT_SHOW then parts[#parts + 1] = string.format("%d", slot + 1) end
+  end
+  local text
+  if #list == 0 then
+    text = "NEXT   -"
+  else
+    text = "NEXT   " .. table.concat(parts, " > ")
+    if #list > NEXT_SHOW then text = text .. " > ..." end
+    text = text .. string.format("   (%d levels)", #list)
+  end
+  if not sure then text = text .. " ?" end
+  gui.text(4, 172, text, color)
+  if sure and next_prev_count ~= nil and #list ~= next_prev_count then
+    local msg = string.format("入れ子 %d段 このあと読むメモ %s", #list, (#list > 0) and table.concat(all, ">") or "-")
+    console.log("ladybug-tools: フレーム " .. emu.framecount() .. " " .. msg)
+    next_note = msg
+  end
+  if sure then next_prev_count = #list end
+end
+
+event.onloadstate(function() next_prev_count = nil next_note = nil end, "ladybug-next-load")
+
 local function draw_memo_list()
   local now = emu.framecount()
   for i = 0, 10 do
     local color = "white"
     local d = memo_hit[i] and (now - memo_hit[i]) or nil
     if d ~= nil and d >= 0 and d <= OVERWRITE_SHOW then color = "red" end
-    gui.text(4 + (i % 2) * 190, 172 + math.floor(i / 2) * 16, string.format("%2d %s >%s", i + 1, memo_ptr(i), memo_end(i)), color)
+    gui.text(4 + (i % 2) * 190, 188 + math.floor(i / 2) * 16, string.format("%2d %s >%s", i + 1, memo_ptr(i), memo_end(i)), color)
   end
 end
 
@@ -386,7 +464,7 @@ local function draw_memo()
     gui.text(260, 60, string.format("COUNT %d", depth + 1), "orange")
   end
   if cur >= 12 then
-    gui.text(4, 268, string.format("MEMO %d is outside the memo area ($%04X)", cur + 1, 0x129C + cur * 8), "red")
+    gui.text(4, 284, string.format("MEMO %d is outside the memo area ($%04X)", cur + 1, 0x129C + cur * 8), "red")
   end
   gui.text(4, 76, string.format("12th   %s >%s", memo_ptr(11), memo_end(11)), color)
   if last_cmd_frame == nil then
@@ -404,6 +482,7 @@ local function draw_memo()
     if sp < STACK_DANGER then sp_color = "red" elseif sp < STACK_WARN then sp_color = "yellow" end
     gui.text(4, 156, string.format("STACK  S=$%04X", sp), sp_color)
   end
+  draw_next()
   if SHOW_MEMO_LIST then draw_memo_list() end
 end
 
@@ -522,6 +601,8 @@ local function log_step()
     log_prev_danger = false
     log_prev_mismatch = nil
     overwrite_notes = {}
+    next_note = nil
+    next_prev_count = nil
     return
   end
 
@@ -574,6 +655,11 @@ local function log_step()
     end
   end
 
+  -- 入れ子の段数が変わったときは、ほかのきっかけがあっても後ろに付けて書く
+  if next_note ~= nil then
+    if why == nil then why = next_note else why = why .. " / " .. next_note end
+    next_note = nil
+  end
   if why ~= nil then
     log_file:write(string.format("%d\t%d\t%s\t%s\t%s\n", now, cur + 1, ptr, memo_ptr(11), why))
     log_file:flush()
@@ -633,6 +719,8 @@ local function check_rewind()
     last_cmd_frame = nil
     recent = {}
     reset_memo_watch()
+    next_prev_count = nil
+    next_note = nil
     ending_frame = nil
     last = nil
   end
