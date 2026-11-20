@@ -496,13 +496,14 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   <div class="eyebrow">7 ／ 応用</div>
   <h2>TASは、本物のエンディングスクリプトの最後の2バイトを読ませている</h2>
   <p>7,279F版は8回の押下と3回のジャンプで、エンディング演出のスクリプト（番号0x277）の最後にある <code>40 70</code>（エンディング開始）へ、ちょうど読む場所を合わせています。</p>
+  <p>エンディングの始め方は、仕組みの上で2通り考えられます。<b>① スクリプトの命令 <code>40 70</code>（または <code>40 6F</code>）を読ませる方法</b>と、<b>② スクリプトを経由せず、エンディングの処理を直接呼ばせる方法</b>です。実際に成功しているのは①だけで、この章の大部分は①の説明です。②は入口になりうる仕組みを確かめた段階で、章の最後にまとめます。</p>
   <figure class="fig">
     <div class="scroll"><svg id="tas" viewBox="0 0 720 330" width="720" role="img" aria-label="TASの経路。フレームごとの読む場所の推移"></svg></div>
     <div class="legend"><span style="--c:var(--accent)">バンク$1Aを読んでいる</span><span style="--c:var(--bank2)">バンク$1Bを読んでいる</span><span style="--c:var(--hot)">エンディング命令の場所</span></div>
     <figcaption>線が右下がりなのが「時計によるずれ」、垂直に跳ぶのが「ジャンプ命令」です。下の表の行を押すと、その時点に印が付きます。</figcaption>
   </figure>
   <figure class="fig">
-    <h3>エンディングを呼ぶ条件</h3>
+    <h3>方法①：エンディングを呼ぶ条件</h3>
     <p class="small">エンディング開始の命令 <code>40 70</code> がある場所に、読む場所を合わせれば始まります。読む場所は直接指定できないので、「決まった下位バイトのボタン待ちに止まる」ことが本質的な条件です。止まれさえすれば、あとは待つフレーム数で合わせられます。</p>
     <div class="scroll"><table>
       <thead><tr><th>条件</th><th>$1B:B476 を狙う場合</th><th>TASでの満たし方</th></tr></thead>
@@ -539,6 +540,34 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       </tbody>
     </table></div>
     <figcaption>候補は上の表と同じ数え方で、<wbr>$1A:BB57 狙いは $1A:A056、<wbr>$1A:CB56、<wbr>$1A:F256、<wbr>$1A:F656、<wbr>$1B:D356、<wbr>$1C:B256、<wbr>$1D:CE4D 狙いは $1A:9A4C、<wbr>$1A:C04C、<wbr>$1B:834C、<wbr>$1C:C34C です。発火直後の状態で $1A:BB57 を読ませると、その場でエピローグに入ることを確かめました。この場所を時間内に読ませる道筋があるかは、まだ確かめていません。$1D:CE4D はバンク$1Dを実測していないため、まだ調べていません。</figcaption>
+  </figure>
+  <figure class="fig">
+    <h3>方法①の実例：TAS以外の入口</h3>
+    <p class="small">8か所の <code>40 70</code> のうち、TASが使う $1B:B476 以外の4か所にも、実際に届く押し方を確かめました。どれもボタン待ちの間にAを押すだけで、ジャンプ命令もXも使いません。最後の入力がTAS（7,278F）より遅いので、短縮にはなりません。</p>
+    <div class="scroll"><table>
+      <thead><tr><th>入口</th><th>Aを押すフレーム</th><th>押す回数</th><th>最後の入力</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">$1B:B0B3</td><td class="mono">7209・7217・7226・7328</td><td class="n">4</td><td class="n">7,328F</td></tr>
+        <tr><td class="mono">$1B:B280</td><td class="mono">7205・7217・7244・7254・7332</td><td class="n">5</td><td class="n">7,332F</td></tr>
+        <tr><td class="mono">$1B:AE33</td><td class="mono">7205・7251・7336</td><td class="n">3</td><td class="n">7,336F</td></tr>
+        <tr><td class="mono">$1B:B1BE</td><td class="mono">7205・7216・7226・7233・7242・7247・7253・7267・7281・7292・7342・7353</td><td class="n">12</td><td class="n">7,353F</td></tr>
+        <tr><td><span class="mono">$1B:B476</span><br><span class="muted small">TAS（Xを2回含む）</span></td><td class="mono">7215・7218・7221・7227・7235・7244・7255・7278</td><td class="n">8</td><td class="n">7,278F</td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>フレームは入力ファイルの行の番号（0始まり）です。どれも最後のAを押したフレーム、または数フレーム後にエンディングの処理（<span class="mono">$03:8D63</span>）へ入ることを、最初から通しで実行して確かめました。$1B:AE33 へ入る経路は押下が3回で、見つかっている中で最も少ない操作です。$1B:B1BE の経路は、ランダムに押した試行でたまたま見つかったものを、必要な押下だけに絞りました。</figcaption>
+  </figure>
+  <figure class="fig">
+    <h3>方法②：処理スクリプトの命令から直接呼ぶ（未確認）</h3>
+    <p class="small"><code>40 70</code> の処理は、中で <span class="mono">$03:800F</span> を呼んでいるだけです（<code>40 6F</code> は <span class="mono">$03:800C</span>）。スクリプトとは別に、番地を指定してプログラムを呼び出せる仕組みがあれば、<code>40 70</code> を読ませなくてもエンディングは始まります。その仕組みが「処理スクリプト」（補足「処理スクリプトと暴走」）の3番の命令です。</p>
+    <div class="scroll"><table>
+      <thead><tr><th>分かっていること</th><th>分かっていないこと</th></tr></thead>
+      <tbody>
+        <tr><td>処理スクリプトが <span class="mono">（下位5ビットが3の値）0F 80 03</span> の4バイトを読めば、エンディングの処理が呼ばれる</td><td>この4バイトの並びを、処理スクリプトに読ませる方法</td></tr>
+        <tr><td>ROMの中に <span class="mono">0F 80 03</span>・<span class="mono">0C 80 03</span> は7か所あるが、直前のバイトが条件に合うものも、処理スクリプトが読むバンク$1Dにあるものもない</td><td>RAMにこの並びを作れるか</td></tr>
+        <tr><td>スクリプトの命令 <code>1E</code> の引数（処理スクリプトの番号）がでたらめだと、処理スクリプトをRAMなどROMの外から読み始める。256個の番号のうち93個がRAMを指す</td><td>狙った番号の <code>1E</code> を読ませ、狙ったRAMの場所から読ませられるか</td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>メモの先頭3バイトは「読む場所」なので、<span class="mono">$03:800F</span> を指すメモがあれば、そこがちょうど <span class="mono">0F 80 03</span> の並びになります。12枚目のメモは時計で値が変わりますが、バンクが$03まで下がるには約5,900フレームかかるので、この形では7,279Fより早くなりません。いまのところ、方法②の成功例はありません。</figcaption>
   </figure>
   <h3>概略版</h3>
   <div class="scroll"><table id="tasTable">
@@ -656,17 +685,69 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
 </section>
 
 <section>
+  <div class="eyebrow">補足 ／ 処理スクリプトと暴走</div>
+  <h2>スクリプトの裏に、もう1つのスクリプトがある</h2>
+  <p>イベントのスクリプトは、変数の計算や、音・マップ移動などゲーム本体の処理の呼び出しを、自分では行いません。命令 <code>1E</code> で<b>処理スクリプト</b>という別のスクリプトを呼び出して任せます。イベントのスクリプトがセリフと進行の台本なら、処理スクリプトは、変数を整えて本体の処理を動かす裏方です。レイディバグ中の暴走は、ほとんどがここで起きます。</p>
+
+  <h3>処理スクリプトのしくみ</h3>
+  <p>命令 <code>1E</code> の次の1バイトが処理スクリプトの番号です。番号を2倍してバンク$1Dの先頭（<span class="mono">$1D:8000</span>〜）の一覧表を引き、そこに書かれた番地から読み始めます（<span class="mono">$00:DD7C</span>〜）。読み取り位置はメモとは別の場所（<span class="mono">$126F</span>〜<span class="mono">$1271</span>）にあり、時計とは重なりません。1バイト読むごとに、下位5ビットを命令の番号として処理します。下位5ビットが <span class="mono">1F</span> なら終了です。</p>
+  <div class="scroll"><table>
+    <thead><tr><th>番号</th><th>働き</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">0・A</td><td>計算の対象（変数など）を指定する。上位3ビットで対象の種類を選ぶ</td></tr>
+      <tr><td class="mono">1</td><td>計算の種類を選んで実行する（代入・加算・比較など約30種類。別の表を引く）</td></tr>
+      <tr><td class="mono">2</td><td>指定した場所へ読み取り位置を移す</td></tr>
+      <tr><td class="mono">3</td><td>続く3バイトの番地のプログラムを呼ぶ</td></tr>
+      <tr><td class="mono">4</td><td>扱うデータのバンクを切り替える</td></tr>
+      <tr><td class="mono">5</td><td>戻る場所を控えてから、指定した場所へ移る（呼び出し）</td></tr>
+      <tr><td class="mono">6</td><td>控えておいた場所へ戻る</td></tr>
+      <tr><td class="mono">7・8</td><td>変数を1増やす／1減らす</td></tr>
+      <tr><td class="mono">9</td><td>5と同じ呼び出しだが、行き先を変数から取る</td></tr>
+      <tr><td class="mono">B・C</td><td>バンク$7Fのデータ128バイトを退避する／元に戻す</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small muted">命令は 0〜C の13個です（<span class="mono">$00:DDCF</span> の表）。0・1・Aと、1から引く計算の表は、細かいところまでは読めていません。通常のプレイで3番が呼ぶプログラムは、見た範囲では音の処理（<span class="mono">$04:8004</span>）とフィールド側の処理（<span class="mono">$01:8005</span>）の2つでした。5章のスクリプト0x194は、処理スクリプトの0B番を呼んで音の処理を動かしています。</p>
+
+  <h3>暴走の原因は、範囲を確かめずに表を引くこと</h3>
+  <p>ゲームは「番号で表を引き、書かれた番地へ進む」処理を何段も重ねていて、どの段にも番号の範囲の確認がありません。読む場所がずれて、でたらめな番号が入ると暴走します。集めた暴走は、次の型のどれかでした。</p>
+  <div class="scroll"><table>
+    <thead><tr><th>型</th><th>引く表</th><th>でたらめになる値</th><th>結果</th></tr></thead>
+    <tbody>
+      <tr><td>命令 <code>40</code> の次のバイトが範囲外</td><td>命令 <code>40</code> の処理の一覧（<span class="mono">00</span>〜<span class="mono">79</span>）</td><td><code>40</code> の次のバイト</td><td>でたらめな番地へ直接飛ぶ</td></tr>
+      <tr><td>でたらめな番号の処理スクリプト</td><td>処理スクリプトの場所の一覧</td><td><code>1E</code> の次のバイト</td><td>処理スクリプトをROMの外から読み始める。たいてい次の型に続く</td></tr>
+      <tr><td>処理スクリプトの中の、範囲外の命令</td><td>処理スクリプトの命令の一覧（<span class="mono">0</span>〜<span class="mono">C</span>）</td><td>処理スクリプトの1バイト</td><td>でたらめな番地へ直接飛ぶ</td></tr>
+      <tr><td>呼び出していないのに「戻る」</td><td>（表ではなく、控えの場所）</td><td>6番の命令が読む控え</td><td>読み取り位置がRAMへ移り、上の型に続く</td></tr>
+      <tr><td>バンク$02の処理から戻るときに飛ぶ</td><td>—</td><td>CPUのスタックに積まれた戻り先</td><td>RAMの番地へ戻る（原因は未特定）</td></tr>
+    </tbody>
+  </table></div>
+  <div class="scroll"><table>
+    <thead><tr><th></th><th>Aを押すフレーム</th><th>暴走が始まるフレーム</th></tr></thead>
+    <tbody>
+      <tr><td>見つかっている中で最も早い</td><td class="mono">7209・7224・7244・7253・7256</td><td class="n">7,256F</td></tr>
+      <tr><td>2回の押下で最も早い</td><td class="mono">7230・7271</td><td class="n">約7,279F</td></tr>
+      <tr><td>最も少ない操作</td><td class="mono">7713（1回）</td><td class="n">約7,714F</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small muted">「暴走」は、フレームの切れ目の実行位置がRAMにある状態が続くことです。ボタン待ちの間の押し方に限れば、7,254Fまでの押下では暴走しないことを、到達できる全状態（7,254F時点で約62万通り）で確かめました。7,255Fの押下は一部しか調べていないので、最速は7,255Fか7,256Fです。文章の途中での押下は調べていません。ランダムに押した600回の試行では、暴走は6回（1%）、命令を読まなくなって止まるのが303回、2,500フレーム後も進んでいたのが290回、エンディングが1回でした。</p>
+
+  <h3>ボタンによる違いと、暗転の裏で開く地図</h3>
+  <p>ボタン待ちで押すボタンを変えても、次に止まる場所とフレームは変わりませんでした（1,050通りで比較）。違いは「どのボタンを押したか」を覚えている数バイトだけで、メモの領域は1バイトも変わりません。Bを押したときだけ <span class="mono">$16BE</span> に印が付きます。同じボタンを続けて2フレーム押すと、2回目は無視されます。</p>
+  <p>例外は、処理スクリプトが別の画面を開いている場面です。バグ発生後、7,200FにAを1回押すと、暗転の裏でマルディアスの地図（行き先選び）が開きます。ここでは ↑・X と ↓・Y がカーソルの移動、Aが決定、Bがキャンセルで、L・R・←・→ には反応しません。ただし、どの行き先を選んでも移動はせず、そのあと読まれる命令も場所も同じでした。変わるのは、選んだ番号を覚える1バイト（<span class="mono">$1236</span>）だけです。</p>
+</section>
+
+<section>
   <div class="eyebrow">8 ／ 限界</div>
   <h2>できないことと、まだ分かっていないこと</h2>
   <div class="row">
     <div><h3>できないこと（今回調べた仕組みの範囲で）</h3><ul class="plain small">
       <li>読む場所を自由に指定すること。今回調べた経路で結果を変えられたのは「何フレーム目に押すか」と「Xを使うか」だけでした。</li>
-      <li>RAMの内容（名前や所持品）を命令として実行させること。読む場所は常にROMの中に補正されます。</li>
+      <li>メモの読む場所にRAMを指させて、RAMの内容（名前や所持品）をスクリプトの命令として実行させること。メモの読む場所は常にROMの中に補正されます。（処理スクリプトは別で、番号によってはRAMから読みます。補足「処理スクリプトと暴走」）</li>
       <li>この追い返しの繰り返しで、9回以下で起こすこと。12枚目に達して初めて時計と重なります。ほかの方法でメモを12枚目まで積めるかどうかは調べていません。</li>
     </ul></div>
     <div><h3>未確認</h3><ul class="plain small">
       <li>次の港のイベントが始まる瞬間と、Xが効く箇所のプログラム上の場所。</li>
-      <li>60種類の命令と約120種類の副命令の大半の意味。</li>
+      <li>60種類の命令と約120種類の副命令の大半の意味。処理スクリプトの計算の命令の細部。</li>
+      <li>方法②（処理スクリプトからエンディングの処理を直接呼ぶ）が実際にできるかどうか。</li>
       <li>13枚目より先のメモの置き場所が、何のデータと重なっているか。1〜6枚目のメモを上書きする命令があるかどうか。</li>
       <li>本物のスーパーファミコンでの再現。すべてエミュレーター（BizHawk 2.11.1、BSNESv115+）上の結果です。</li>
     </ul></div>
