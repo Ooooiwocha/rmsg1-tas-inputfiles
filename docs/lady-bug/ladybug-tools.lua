@@ -30,6 +30,10 @@
 --   入力を受け付けているときは、その下に表示する：
 --     INPUT: CHOICE  選択肢の入力待ち（水色）。A・B・←・→で結果が変わる
 --     INPUT: PRESS   ボタンを押すのを待っている（会話送り・何か押せば進む待ちなど。命令 46 のように時間で勝手に進む待ちもある）
+--       待ちの種類が分かるときは、続けて次のどちらかを出す：
+--       [CMD 12]  ボタン待ちの命令 12 の待ち。12枚目のメモで待っているときは、押すフレームで次に読む場所が変わる（橙）
+--       [END]     スクリプトが終わり、文章の窓を閉じる前の待ち。押すとその段が終わって外側の段に戻るので、
+--                 押すフレームでは行き先が変わらない。12枚目のメモの読み取り位置が終了位置に重なったときにも起きる
 --     INPUT: HOLD    押しっぱなしのボタンを見ている（フィールドの歩行など。SHOW_HOLD = true のときだけ）
 --   エンディングに入ったら、入口（40 6F か 40 70）、命令 40 から入ったか命令を読まずに飛んできたか、
 --   その直前に読んだ命令の位置を記録に書き、画面に ENDING と出す。
@@ -498,6 +502,22 @@ end
 -- （ふだんは $BAF9 も積まれているが、カーソルの点滅などで数フレームだけ別の戻り先になるので見ない）
 -- 選択肢待ちでは A（カーソルの行）・B（キャンセル $FF）・←（$FC）・→（$FD）で結果が変わる。
 local USE_CHOICE_DISPLAY = true
+-- ボタンを待つ共通の処理（$00:DCF1）を、だれが呼んだか。スタックの戻り先で見分ける。
+--   $C64D（命令 12 の処理 $00:C64B から）→ "CMD12"
+--   $A149（スクリプトの終わりの処理 $00:A147 から。文章の窓が開いているときだけ）→ "END"
+local function press_wait_kind()
+  local sp = reg("S")
+  if sp == nil then return nil end
+  sp = sp % 0x10000
+  if sp >= 0x1FA0 then return nil end
+  for i = 1, 0x60 do
+    local lo = memory.read_u8(sp + i, "WRAM")
+    local hi = memory.read_u8(sp + i + 1, "WRAM")
+    if lo == 0x4D and hi == 0xC6 then return "CMD12" end
+    if lo == 0x49 and hi == 0xA1 then return "END" end
+  end
+  return nil
+end
 local function in_choice_wait()
   local sp = reg("S")
   if sp == nil then return false end
@@ -547,7 +567,16 @@ local function draw_choice()
   if new_on and in_choice_wait() then
     gui.text(4, 124, "INPUT: CHOICE (A / B / LEFT / RIGHT)", "cyan")
   elseif new_on then
-    gui.text(4, 124, "INPUT: PRESS (wait for button)", "lime")
+    local kind = press_wait_kind()
+    if kind == "CMD12" and last_slot == 11 then
+      gui.text(4, 124, "INPUT: PRESS [CMD 12 on memo 12] press frame changes the next read", "orange")
+    elseif kind == "CMD12" then
+      gui.text(4, 124, "INPUT: PRESS [CMD 12]", "lime")
+    elseif kind == "END" then
+      gui.text(4, 124, "INPUT: PRESS [END] script ended; returns to outer level", "lime")
+    else
+      gui.text(4, 124, "INPUT: PRESS (wait for button)", "lime")
+    end
   elseif held_on and SHOW_HOLD then
     gui.text(4, 124, "INPUT: HOLD (held buttons)", "lime")
   end
