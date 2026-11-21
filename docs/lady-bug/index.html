@@ -543,18 +543,19 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   </figure>
   <figure class="fig">
     <h3>方法①の実例：TAS以外の入口</h3>
-    <p class="small">8か所の <code>40 70</code> のうち、TASが使う $1B:B476 以外の4か所にも、実際に届く押し方を確かめました。どれもボタン待ちの間にAを押すだけで、ジャンプ命令もXも使いません。最後の入力がTAS（7,278F）より遅いので、短縮にはなりません。</p>
+    <p class="small">TASが使う $1B:B476 以外の入口にも、実際に届く押し方を確かめました（<code>40 70</code> が4か所、エピローグから始まる <code>40 6F</code> が1か所）。どれもボタン待ちの間にAを押すだけで、Xは使いません。最後の入力がTAS（7,278F）より遅いので、短縮にはなりません。<br>押し方は、押すフレームではなく「どのボタン待ちで待っていて、押したときに12枚目のメモがどこを指しているか」で書いています。読み始める場所は、待っている場所の上位バイトを待ったフレーム数だけ減らし（ノコギリの形で1つ上のバンクへ移ることがあります）、下位バイトを1つ進めた場所です。同じ場所で待っていて同じ読み始めの場所を狙えば、何フレーム目にそこへ着いたかに関係なく、読む場所は同じになります（ほかの状態が違えば、そのあとの動きが変わることはあります）。</p>
     <div class="scroll"><table>
-      <thead><tr><th>入口</th><th>Aを押すフレーム</th><th>押す回数</th><th>最後の入力</th></tr></thead>
+      <thead><tr><th>入口</th><th>押し方（ボタン待ちの場所 → 押したときに読み始める場所）</th><th>押す回数</th><th>最後の入力</th></tr></thead>
       <tbody>
-        <tr><td class="mono">$1B:B0B3</td><td class="mono">7209・7217・7226・7328</td><td class="n">4</td><td class="n">7,328F</td></tr>
-        <tr><td class="mono">$1B:B280</td><td class="mono">7205・7217・7244・7254・7332</td><td class="n">5</td><td class="n">7,332F</td></tr>
-        <tr><td class="mono">$1B:AE33</td><td class="mono">7205・7251・7336</td><td class="n">3</td><td class="n">7,336F</td></tr>
-        <tr><td class="mono">$1B:B1BE</td><td class="mono">7205・7216・7226・7233・7242・7247・7253・7267・7281・7292・7342・7353</td><td class="n">12</td><td class="n">7,353F</td></tr>
-        <tr><td><span class="mono">$1B:B476</span><br><span class="muted small">TAS（Xを2回含む）</span></td><td class="mono">7215・7218・7221・7227・7235・7244・7255・7278</td><td class="n">8</td><td class="n">7,278F</td></tr>
+      <tr><td><span class="mono">$1B:B0B3</span><br><span class="muted small">40 70</span></td><td class="mono small">$1A:B917→$1A:AD18<br>$1A:AD27→$1A:A528<br>$1A:A158→$1A:9C59<br>$1A:90B1→$1B:B0B2<br><span class="muted">押すフレーム：7209・7217・7226・7328</span></td><td class="n">4</td><td class="n">7,328F</td></tr>
+      <tr><td><span class="mono">$1B:B280</span><br><span class="muted small">40 70</span></td><td class="mono small">$1A:B917→$1A:B118<br>$1A:AD27→$1A:A528<br>$1A:A158→$1A:8A59<br>$1A:8470→$1A:8071<br>$1A:807E→$1B:B27F<br><span class="muted">押すフレーム：7205・7217・7244・7254・7332</span></td><td class="n">5</td><td class="n">7,332F</td></tr>
+      <tr><td><span class="mono">$1B:AE33</span><br><span class="muted small">40 70</span></td><td class="mono small">$1A:B917→$1A:B118<br>$1A:AD27→$1A:8328<br>$1A:8332→$1B:AE33<br><span class="muted">押すフレーム：7205・7251・7336</span></td><td class="n">3</td><td class="n">7,336F</td></tr>
+      <tr><td><span class="mono">$1B:B1BE</span><br><span class="muted small">40 70</span></td><td class="mono small">$1A:B917→$1A:B118<br>$1A:AD27→$1A:A628<br>$1A:A62E→$1A:9C2F<br>$1A:9A3C→$1A:953D<br>$1A:953F→$1A:8C40<br>$1A:8C4A→$1A:874B<br>$1A:8565→$1A:8166<br>$1A:8171→$1B:F372<br>$1A:8764→$1B:FF65<br>$1B:F77C→$1B:F47D<br>$1B:C5A5→$1B:C2A6<br>$1B:C0B8→$1B:B7B9<br><span class="muted">押すフレーム：7205・7216・7226・7233・7242・7247・7253・7267・7281・7292・7342・7353</span></td><td class="n">12</td><td class="n">7,353F</td></tr>
+      <tr><td><span class="mono">$1A:BB57</span><br><span class="muted small">40 6F</span></td><td class="mono small">$1A:B917→$1A:A818<br>$1A:A81D→$1A:951E<br>$1A:8565→$1B:FD66<br>$1B:FB6F→$1B:F870<br>$1B:F77C→$1B:F67D<br>$1B:F698→$1B:F399<br>$1B:F39E→$1B:F19F<br>$1A:CB56→$1A:BB57<br><span class="muted">押すフレーム：7214・7233・7249・7254・7256・7259・7261・7290</span></td><td class="n">8</td><td class="n">7,290F</td></tr>
+      <tr><td><span class="mono">$1B:B476</span><br><span class="muted small">40 70・TAS</span></td><td class="mono small">$1A:B917→$1A:A718<br>$1A:A71C→$1A:A41D<br>$1A:A428→$1A:A129<br>$1A:B825→$1A:B426<br>$1A:B430→$1A:AC31<br><span class="muted">（文章の途中で X → $1A:B6AD）</span><br><span class="muted">（文章の途中で X → $1A:ABB4）</span><br>$1B:C275→$1B:B476<br><span class="muted">押すフレーム：7215・7218・7221・7227・7235・7244・7255・7278</span></td><td class="n">8</td><td class="n">7,278F</td></tr>
       </tbody>
     </table></div>
-    <figcaption>フレームは入力ファイルの行の番号（0始まり）です。どれも最後のAを押したフレーム、または数フレーム後にエンディングの処理（<span class="mono">$03:8D63</span>）へ入ることを、最初から通しで実行して確かめました。$1B:AE33 へ入る経路は押下が3回で、見つかっている中で最も少ない操作です。$1B:B1BE の経路は、ランダムに押した試行でたまたま見つかったものを、必要な押下だけに絞りました。なお、命令 <code>40</code> は次のバイトの最上位ビットを無視するので、<code>40 F0</code> は <code>40 70</code>、<code>40 EF</code> は <code>40 6F</code> と同じ処理が選ばれます（番号を2倍した下位8ビットが、どちらも同じになるためです。そのあとの状態まで同じになるとは限りません）。バンク$19〜$1Bにある <code>40 F0</code>・<code>40 EF</code> は <span class="mono">$19:942D</span> の1か所だけです。</figcaption>
+    <figcaption>フレームは入力ファイルの行の番号（0始まり）です。<code>40 70</code> の経路は、どれも最後のAを押したフレーム、または数フレーム後にエンディングの処理（<span class="mono">$03:8D63</span>）へ入ることを、最初から通しで実行して確かめました。<code>40 6F</code> の経路（$1A:BB57）は、7,290Fに <code>40</code> を読んでエピローグから始まり、エンディングの処理に入るのは8,006Fです。この経路は、別のチャットで行った探索の結果を、こちらで通しで実行して確かめたものです。押し方の欄で「文章の途中で X」とあるのは、ボタン待ちではなく、文字を書いている途中で押すもの（TASの7,244F・7,255F）です。$1B:AE33 へ入る経路は押下が3回で、見つかっている中で最も少ない操作です。$1B:B1BE の経路は、ランダムに押した試行でたまたま見つかったものを、必要な押下だけに絞りました。なお、命令 <code>40</code> は次のバイトの最上位ビットを無視するので、<code>40 F0</code> は <code>40 70</code>、<code>40 EF</code> は <code>40 6F</code> と同じ処理が選ばれます（番号を2倍した下位8ビットが、どちらも同じになるためです。そのあとの状態まで同じになるとは限りません）。バンク$19〜$1Bにある <code>40 F0</code>・<code>40 EF</code> は <span class="mono">$19:942D</span> の1か所だけです。</figcaption>
   </figure>
   <figure class="fig">
     <h3>方法②：処理スクリプトの命令から直接呼ぶ（未確認）</h3>
