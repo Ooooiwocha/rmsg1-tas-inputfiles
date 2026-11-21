@@ -266,7 +266,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   <p>上位バイトが1減ると、読む場所は256バイト手前に移ります。ボタン待ちで止まっている間も時計は進むので、<b>何フレーム目に押すか</b>で、次に読まれる場所が変わります。</p>
   <figure class="fig">
     <div class="readout">
-      <div><small>発火からのフレーム</small><b id="tF">0</b></div>
+      <div><small>発火からのフレーム</small><b id="tF">3（TASでは7,198F）</b></div>
       <div><small>カウンタ</small><b id="tC" style="color:var(--count)">0x1AB9</b></div>
       <div><small>いま押すと読み始める場所</small><b id="tA" style="color:var(--hot)">$1A:B818</b></div>
     </div>
@@ -278,8 +278,9 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   </figure>
   <figure class="fig">
     <h3>待ち続けたときに読む場所（押すフレームごと）</h3>
+    <p class="small">フレームは、バグの発火（12枚目のメモが書き換わるフレーム）を0として数えています。TASの前半が縮んでも、発火からのフレーム数で見れば同じ関係が成り立ちます。かっこ内は、いまのTASでのフレーム番号です。</p>
     <div class="readout">
-      <div><small>押すフレーム</small><b id="sF">7,200</b></div>
+      <div><small>押すフレーム（発火から）</small><b id="sF">5</b><small id="sFt" style="display:block;margin-top:2px">（TASでは7,200F）</small></div>
       <div><small>プレイ時間カウンタ</small><b id="sC" style="color:var(--count)">0x1AB6</b></div>
       <div><small>補正</small><b id="sN" style="font-size:14px;line-height:1.5;font-family:var(--f-body)">なし</b></div>
       <div><small>点Pの読み始める場所</small><b id="sA" style="color:var(--hot)">$1A:B618</b></div>
@@ -830,7 +831,7 @@ function drawTape(){
     el('text',{x:x+W/2,y:86,'font-size':11,'text-anchor':'middle',fill:'var(--hot)'},tape,'ここ');
   }
   el('text',{x:4,y:86,'font-size':11,fill:'var(--muted)'},tape,'バンク$1A　← 手前（小さい番地）');
-  document.getElementById('tF').textContent=tk;
+  document.getElementById('tF').textContent=(tk+3)+'（TASでは'+(7198+tk).toLocaleString()+'F）';
   document.getElementById('tC').textContent='0x'+hex(0x1AB9-tk,4);
   document.getElementById('tA').textContent='$'+hex(a.bank,2)+':'+hex(a.hi,2)+'18';
 }
@@ -845,8 +846,8 @@ drawTape();
   const s=document.getElementById('saw'),L=64,R=706,T=18,B=206,K=900;
   const X=k=>L+(R-L)*k/K, Y=a=>B-(B-T)*(a-0x8000)/0x7FFF;
   for(const a of [0x8000,0xA000,0xC000,0xE000,0xFFFF]){ el('line',{x1:L,x2:R,y1:Y(a),y2:Y(a),stroke:'var(--line)'},s); el('text',{x:L-6,y:Y(a)+4,'font-size':11,'text-anchor':'end',fill:'var(--muted)'},s,hex(a,4)); }
-  for(let k=0;k<=K;k+=150){ el('text',{x:X(k),y:B+16,'font-size':11,'text-anchor':k===K?'end':'middle',fill:'var(--muted)'},s,(7198+k).toLocaleString()); }
-  el('text',{x:(L+R)/2,y:B+36,'font-size':11.5,'text-anchor':'middle',fill:'var(--muted)',style:'font-family:var(--f-body)'},s,'押すフレーム');
+  for(let k=0;k<=K;k+=150){ el('text',{x:X(k),y:B+16,'font-size':11,'text-anchor':k===K?'end':'middle',fill:'var(--muted)'},s,(k+3).toLocaleString()); }
+  el('text',{x:(L+R)/2,y:B+36,'font-size':11.5,'text-anchor':'middle',fill:'var(--muted)',style:'font-family:var(--f-body)'},s,'押すフレーム（発火を0とする）');
   el('text',{x:4,y:10,'font-size':11.5,fill:'var(--muted)',style:'font-family:var(--f-body)'},s,'読み始める番地（バンク内）');
   let k=2;
   while(k<K){ const a=addr(k); let e=k; while(e+1<K && addr(e+1).bank===a.bank && addr(e+1).hi===addr(e).hi-1) e++;
@@ -864,7 +865,7 @@ drawTape();
   function show(){ const c=0x1AB8-pk, a=addr(pk), x=X(pk), y=Y(a.hi*256+0x18);
     gl.setAttribute('x1',x); gl.setAttribute('x2',x); dot.setAttribute('cx',x); dot.setAttribute('cy',y);
     lab.setAttribute('x',x+9); lab.setAttribute('y',Math.max(T+12,y-8));
-    sF.textContent=(7198+pk).toLocaleString(); sC.textContent='0x'+hex(c,4);
+    sF.textContent=(pk+3).toLocaleString(); document.getElementById('sFt').textContent='（TASでは'+(7198+pk).toLocaleString()+'F）'; sC.textContent='0x'+hex(c,4);
     const low=(c&0xFF)<0x80;
     sN.textContent=low?'あり：下位 '+hex(c&0xFF,2)+' が80未満 → バンク＋1、上位＋80':'なし：下位 '+hex(c&0xFF,2)+' は80以上';
     sN.style.color=low?'var(--hot)':'var(--ink)';
