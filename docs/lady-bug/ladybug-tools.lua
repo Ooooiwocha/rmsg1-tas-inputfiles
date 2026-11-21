@@ -4,7 +4,8 @@
 -- さらに、いま読んでいるメモが何枚目か（スタックの段数）を画面に表示する。
 --   1行目：MEMO 実際に命令を読んでいるメモが何枚目か と、その読み取り位置（バンク:番地）
 --     命令の読み出し口（$00:A0A5）で最後に使われたメモを表示する。枚数の数字（$129B）ではない。
---     開始直後・ステート読み込み直後など、まだ命令を読んでいない間だけ、枚数の数字で代用する。
+--     開始直後・ステート読み込み直後など、まだ命令を読んでいない間だけ、枚数の数字で代用し、数字の後ろに ? を付ける。
+--     巻き戻したときは、そのフレームを前に通ったときの値を覚えておいて戻す（覚えていなければ ? 付きの代用）。
 --     > の右は、そのメモの終了位置。13枚目より先（MEMO 34 など、メモの置き場所の外）を読んでいるときも、
 --     その場所の中身をそのまま出し、一覧の下に赤で知らせる。
 --   2行目：12枚目のメモの中身（時計と重なっていて毎フレーム変わる）
@@ -293,6 +294,9 @@ local recent = {}
 local read_slots = {}        -- このフレームに命令を読んだメモ（0 が1枚目）
 local last_slot = nil        -- 最後に命令を読んだメモ（0 が1枚目）。まだ読んでいなければ nil
 local last_read_s = nil      -- 最後に命令を読んだときのCPUのスタックの位置（S）
+local slot_hist = {}         -- フレームごとの last_slot と last_read_s（巻き戻したときに戻すため）
+local SLOT_HIST_KEEP = 20000 -- 覚えておくフレーム数
+local just_loaded = false    -- ステートを読み込んだ直後か（読み込みは巻き戻しとちがい、別の流れの可能性がある）
 local mismatch_slot = nil    -- 最後に読んだメモが枚数とちがっていたら、そのメモ（0 が1枚目）
 local mismatch_frame = -1000
 -- 1〜11枚目の読み取り位置の見張り。読んでいないのに変わったら上書きとみなす。
@@ -341,7 +345,7 @@ local function on_cmd_read()
 end
 if USE_MEMO_DISPLAY then
   event.on_bus_exec(on_cmd_read, 0x00A0A5, "ladybug-cmd", BUS)
-  event.onloadstate(function() last_cmd_frame = nil recent = {} reset_memo_watch() end, "ladybug-cmd-load")
+  event.onloadstate(function() last_cmd_frame = nil recent = {} reset_memo_watch() just_loaded = true end, "ladybug-cmd-load")
 end
 
 -- 1〜11枚目の読み取り位置を前のフレームと比べる。毎フレーム1回呼ぶ。
@@ -456,11 +460,12 @@ end
 local function draw_memo()
   local depth = memory.read_u8(0x129B, "WRAM")
   local cur = last_slot or depth   -- 実際に読んでいるメモ（分からない間は枚数の数字）
+  local mark = (last_slot == nil) and "?" or ""
   local color = "white"
   if cur >= 11 then color = "red" end
   -- 13枚目より先（一覧にない場所）を読んでいるときも、その場所の中身をそのまま出す
-  gui.text(4, 60, string.format("MEMO %d  %s >%s", cur + 1, memo_ptr(cur), memo_end(cur)), color)
-  if cur ~= depth then
+  gui.text(4, 60, string.format("MEMO %d%s  %s >%s", cur + 1, mark, memo_ptr(cur), memo_end(cur)), color)
+  if last_slot ~= nil and cur ~= depth then
     gui.text(260, 60, string.format("COUNT %d", depth + 1), "orange")
   end
   if cur >= 12 then
@@ -723,7 +728,18 @@ local function check_rewind()
     next_note = nil
     ending_frame = nil
     last = nil
+    -- このフレームを前に通ったときの「読んでいるメモ」を戻す
+    local h = slot_hist[now]
+    if h ~= nil and not just_loaded then
+      last_slot = h[1]
+      last_read_s = h[2]
+    end
   end
+  -- このフレームの始めの値を覚えておく（巻き戻した先で使う）
+  if just_loaded then slot_hist = {} end   -- 別の流れに移ったかもしれないので、覚えた値は捨てる
+  just_loaded = false
+  slot_hist[now] = { last_slot, last_read_s }
+  slot_hist[now - SLOT_HIST_KEEP] = nil
 end
 
 console.log("ladybug-tools: 動作中（明るさ固定=" .. tostring(USE_KEEP_BRIGHT) .. "、フリーズ検出=" .. tostring(USE_FREEZE_DETECT) .. "、メモ表示=" .. tostring(USE_MEMO_DISPLAY) .. "、記録=" .. tostring(USE_LOG) .. "）")
