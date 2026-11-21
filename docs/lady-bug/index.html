@@ -165,6 +165,12 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   </ol>
 </header>
 
+<section class="part" style="border-top:3px solid var(--accent);padding-top:18px">
+  <div class="eyebrow">第I部</div>
+  <h2 style="font-size:clamp(26px,5vw,36px)">バグが起きるしくみ</h2>
+  <p class="small muted">1〜6章。ここまで読めば、レイディバグがなぜ起きるかが分かります。</p>
+</section>
+
 <section>
   <div class="eyebrow">1 ／ スクリプト</div>
   <h2>イベントは「スクリプト」を1バイトずつ読んで進む</h2>
@@ -196,7 +202,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
         <tr><td class="mono">4C〜FF</td><td>文字。1バイトで1文字（漢字は <span class="mono">3F</span> を前に付けて2バイト）</td><td><span class="mono">93</span>（こ）、<span class="mono">A3</span>（は）</td></tr>
       </tbody>
     </table></div>
-    <figcaption>命令の長さは1バイトから9バイトまであります。TASの経路では、レイディバグで狂うのは「どこをスクリプトとして読むか」だけで、CPUも、スクリプトを解釈するプログラムも、エンディングまで正常に動いています。ただし押し方によっては、でたらめな命令から不正な番地へのジャンプやスタックの破壊に進み、暴走することもあります（補足「処理スクリプトと暴走」）。</figcaption>
+    <figcaption>命令の長さは1バイトから9バイトまであります。TASの経路では、レイディバグで狂うのは「どこをスクリプトとして読むか」だけで、CPUも、スクリプトを解釈するプログラムも、エンディングまで正常に動いています。ただし押し方によっては、でたらめな命令から不正な番地へのジャンプやスタックの破壊に進み、暴走することもあります（10章「処理スクリプトと暴走」）。</figcaption>
   </figure>
 </section>
 
@@ -300,6 +306,16 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   <h2>最初の誤動作は、ボタンを押す前に起きている</h2>
   <p>バグが始まるのは、10回目の追い返しでスクリプト0x173が4番目の命令を実行した瞬間です。スクリプト0x173は6つの命令でできていて、1〜9回目と10回目では、問題の起きる場所が違います。</p>
   <figure class="fig">
+    <h3>ここまでの流れ（5章の要点）</h3>
+    <ol class="steps">
+      <li>10回目の追い返しで、スクリプト0x194が12枚目のメモとして呼ばれる（時計と重なる）</li>
+      <li>0x194の最後にある <code>00 FF</code>（スクリプト0xFFへジャンプ＝終了）を読み始める</li>
+      <li>ジャンプ命令は1バイト目と2バイト目の間に2フレームかかり、その間に時計が2進む</li>
+      <li>2バイト目は512バイト手前から読まれ、そこにあった値は <code>8F</code>。<code>00 8F</code> として読まれる</li>
+      <li>本来とは無関係なスクリプト0x8Fが始まり、ボタン待ちで止まる</li>
+    </ol>
+  </figure>
+  <figure class="fig">
     <h3>スクリプト0x173の中身（$1A:FA42〜、17バイト）</h3>
     <div class="scroll"><table>
       <thead><tr><th>順</th><th>バイト列</th><th>内容</th><th>1〜9回目</th><th>10回目</th></tr></thead>
@@ -314,66 +330,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     </table></div>
     <figcaption>1〜9回目は6番目の命令でメモが1枚ずつ残り、10回目は4番目の命令で12枚目に達します。10回目の追い返しでは、セリフのあと世界地図が出る前に、もうバグが始まっています。</figcaption>
   </figure>
-  <figure class="fig">
-    <h3>スクリプト0x194の本来の中身（$1A:FF48〜FFAF、104バイト）</h3>
-    <p class="small">主人公ごとに違う曲番号を選んで鳴らすためのスクリプトです。同じ形のブロックが主人公の数だけ並んでいます。1ブロックは14バイトで、次の5つの命令でできています。</p>
-    <div class="bytes">
-      <span class="by cmd"><i>47 17 01 vv</i><small>曲番号vvを$1701に書く</small></span>
-      <span class="by cmd"><i>28 4n 0E</i><small>条件判定</small></span>
-      <span class="by cmd"><i>1E 0B</i><small>演出0x0B</small></span>
-      <span class="by cmd"><i>28 4n 0E</i><small>条件判定</small></span>
-      <span class="by call"><i>00 FF</i><small>スクリプト0xFFへジャンプ＝終了</small></span>
-    </div>
-    <h3>条件判定 <span class="mono">28 a b</span> の読み方</h3>
-    <ul class="plain small">
-      <li><b>1つ目の引数 a</b>　調べる変数の番号です。変数は $109D から並んでいて、1つが4ビット（0〜F の16通り）です。番号 a の変数は、$109D＋a÷2 のバイトの、a が偶数なら上位4ビット、奇数なら下位4ビットにあります。</li>
-      <li><b>2つ目の引数 b</b>　値の範囲です。上位4ビットが下限、下位4ビットが上限を表します。<span class="mono">0E</span> なら「0以上E以下」です。</li>
-      <li><b>働き</b>　変数の値が範囲に入っていれば、次の2バイトを読み飛ばします。入っていなければ、何もせず次へ進みます。</li>
-    </ul>
-    <p class="small"><span class="mono">28 43 0E</span> は「変数0x43の値が0〜Eなら、次の2バイトを飛ばす」です。飛ばされないのは値がFのときだけなので、「変数0x43がFのときだけ、次の命令を実行する」という意味になります。ホークが主人公のとき、変数0x40〜0x47のうちFになっているのは0x43だけでした。</p>
-    <div class="scroll"><table class="path">
-      <thead><tr><th>ブロック</th><th>場所</th><th>曲番号を書く</th><th>条件判定</th><th>変数がFのときだけ読む</th><th>条件判定</th><th>変数がFのときだけ読む</th></tr></thead>
-      <tbody>
-        <tr><td class="n">1</td><td class="mono">$1A:FF48〜</td><td class="mono rd">47 17 01 1F</td><td class="mono rd">28 40 0E</td><td class="mono sk">1E 0B</td><td class="mono rd">28 40 0E</td><td class="mono sk">00 FF</td></tr>
-        <tr><td class="n">2</td><td class="mono">$1A:FF56〜</td><td class="mono rd">47 17 01 17</td><td class="mono rd">28 41 0E</td><td class="mono sk">1E 0B</td><td class="mono rd">28 41 0E</td><td class="mono sk">00 FF</td></tr>
-        <tr><td class="n">3</td><td class="mono">$1A:FF64〜</td><td class="mono rd">47 17 01 10</td><td class="mono rd">28 42 0E</td><td class="mono sk">1E 0B</td><td class="mono rd">28 42 0E</td><td class="mono sk">00 FF</td></tr>
-        <tr><td class="n">4<br><b style="font-family:var(--f-body);font-size:12px">ホーク</b></td><td class="mono">$1A:FF72〜</td><td class="mono rd">47 17 01 09</td><td class="mono rd">28 43 0E</td><td class="mono rd">1E 0B</td><td class="mono rd">28 43 0E</td><td class="mono rd">00 <span class="late">FF</span></td></tr>
-        <tr><td class="n">5</td><td class="mono un">$1A:FF80〜</td><td class="mono un">47 17 01 01</td><td class="mono un">28 44 0E</td><td class="mono un">1E 0B</td><td class="mono un">28 44 0E</td><td class="mono un">00 FF</td></tr>
-        <tr><td class="n">6</td><td class="mono un">$1A:FF8E〜</td><td class="mono un">47 17 01 07</td><td class="mono un">28 45 0E</td><td class="mono un">1E 0B</td><td class="mono un">28 45 0E</td><td class="mono un">00 FF</td></tr>
-        <tr><td class="n">7</td><td class="mono un">$1A:FF9C〜</td><td class="mono un">47 17 01 0B</td><td class="mono un">28 46 0E</td><td class="mono un">1E 0B</td><td class="mono un">28 46 0E</td><td class="mono un">00 FF</td></tr>
-        <tr><td class="n">8</td><td class="mono un">$1A:FFAA〜</td><td class="mono un">47 17 01 14</td><td class="un">なし</td><td class="mono un">1E 0B</td><td class="un">なし</td><td class="un">なし</td></tr>
-      </tbody>
-    </table></div>
-    <div class="legend"><span style="--c:var(--win)">ホークが主人公のときに読まれる命令</span><span style="--c:var(--hot)">2フレーム後に読まれるバイト</span><span style="--c:transparent;text-decoration:line-through">読み飛ばされる命令</span><span style="--c:transparent;opacity:.45">そこまで進まない命令</span></div>
-    <p class="small">左から右へ、スクリプトに書かれている順番どおりに並べています。色の付いたところを左上から順にたどると、ホークが主人公のときに実際に読まれる道筋になります。1〜3番目のブロックでは、変数（0x40〜0x42）がFではないので、<span class="mono">1E 0B</span> と <span class="mono">00 FF</span> は読み飛ばされます。4番目のブロックでは変数0x43がFなので、5つの命令がすべて読まれ、<span class="mono">00 FF</span> で終わります。<b>色の付いた部分は、最後の1バイトを除いて、同じフレームのうちに一気に読まれます。赤で囲んだ最後の <span class="mono">FF</span> だけは、<span class="mono">00</span> を読んだ2フレーム後に読まれます。</b>レイディバグでは、この2フレームの間に読む場所がずれます。5番目以降には進みません。主人公が違えば、色の付く範囲が変わります。8番目のブロックには条件判定がなく、<span class="mono">1E 0B</span> を必ず読んで、そこでスクリプトの終わりに達します。</p>
-    <h3>4番目のブロックのアドレス</h3>
-    <div class="bytes">
-      <span class="by cmd"><i>47 17 01 09</i><small>$1A:FF72〜FF75</small></span>
-      <span class="by cmd"><i>28 43 0E</i><small>FF76〜FF78</small></span>
-      <span class="by cmd"><i>1E 0B</i><small>FF79〜FF7A</small></span>
-      <span class="by cmd"><i>28 43 0E</i><small>FF7B〜FF7D</small></span>
-      <span class="by call"><i>00</i><small>FF7E（7,195Fに読む）</small></span>
-      <span class="by bad"><i>FF</i><small>FF7F（本来は7,197Fに読む）</small></span>
-    </div>
-    <p class="small">10回目の追い返しでは、7,197Fに読まれるのは赤い <span class="mono">FF</span>（$1A:FF7F に書かれた値）ではありません。時計が減らすのは「読む場所」のアドレスのほうです。2フレームの間に、アドレスの上位バイトが FF から FD に下がるので、読む場所が $1A:FF7F から $1A:FD7F に変わります。$1A:FD7F はこのスクリプトの外で、そこに書かれている値は 8F です。その結果、命令は <span class="mono">00 FF</span> ではなく <span class="mono">00 8F</span> として実行されます。</p>
-    <p class="small">まぎらわしいのですが、ここには FF が2つ出てきます。アドレス $1A:<b>FF</b>7F の上位バイトの FF と、その場所に書かれている値の FF です。時計で変わるのは前者だけで、ROMに書かれた値は変わりません。FF が 8F に減るのではなく、読む場所がずれて、別の場所にあった 8F を読む、ということです。</p>
-    <figcaption>主人公が違うブロックでは <code>1E 0B</code> と <code>00 FF</code> が両方飛ばされ、次のブロックへ進みます。主人公が合うブロックでは、<code>1E 0B</code> を実行し、<code>00 FF</code> で終わります。ホークの場合、先頭から4番目のブロックの <code>00</code>（$1A:FF7E）まで、$1A:FF48 からの55バイトを同じフレームのうちに読みます（読む場所は54バイト進みます）。$1701 は音を鳴らす処理に渡す番号の置き場所です。変数0x40〜0x47が主人公を表していること（ホーク以外では未確認）と、<code>1E 0B</code> が曲を切り替える処理であることは、並びからの推定です。</figcaption>
-  </figure>
-  <details class="aside">
-    <summary>余談：スクリプト0x194は、なぜこんな書き方なのか</summary>
-    <div>
-      <p>同じ条件判定を2回書き、同じ形のブロックを8回並べる。ふつうのプログラムなら「主人公の番号で表を引いて曲番号を取り出す」と1行で済む処理です。こうなっているのは、スクリプトの命令の作りに理由があると考えられます。</p>
-      <ul class="plain">
-        <li><b>条件判定は「次の2バイトを飛ばす」しかできない</b>　飛ばす長さが2バイトに固定されていて、「ここからここまで」という範囲をまとめられません。条件つきで実行したい命令が2つ（<code>1E 0B</code> と <code>00 FF</code>）あるので、命令1つごとに同じ判定を付けています。</li>
-        <li><b>「違えば次へ」を書く方法がない</b>　そのため、先に曲番号を書いてしまい、主人公が違ったら次のブロックで上書きする、という順番になっています。</li>
-        <li><b>飛べるのは別のスクリプトの先頭だけ</b>　ジャンプ命令は、同じスクリプトの数バイト先へ飛ぶ使い方ができません。判定を繰り返すしかなくなります。</li>
-        <li><b>終了が2バイトの <code>00 FF</code> で書かれている</b>　終了だけなら1バイトの <code>1A</code> で足ります。飛ばす長さの2バイトに合わせるために、「終了しか書かれていないスクリプト0xFFへジャンプする」という回り道を使ったのでしょう。</li>
-      </ul>
-      <p>「次の1命令だけを飛ばす」という条件判定は、1960〜70年代の小型コンピューターや一部のマイコンにも見られる、ごく単純な作りです。判定の仕組みを単純にすると、スクリプトを解釈するプログラムは短く済みます。その代わりに、スクリプトを書く側が同じ判定を何度も書くことになります。</p>
-      <p>そして、この書き方がレイディバグの入口になっています。<code>1A</code> は1バイトなので、時計でずれる余地がありません。<code>00 FF</code> は2バイトの間に2フレームかかるので、12枚目のメモの上では、2バイト目として、512バイト手前の別の場所にある値が読まれます（補正がある場合は別）。</p>
-      <p class="muted">この欄の内容は、命令の並びと働きからの推測です。副命令の大半は未解読で、計算や自由な分岐の命令が別にある可能性は残っています。</p>
-    </div>
-  </details>
+  <p class="small muted">スクリプト0x194の中身（主人公ごとのブロック、条件判定 <code>28 a b</code> の読み方、4番目のブロックのアドレス）は付録Aにまとめました。</p>
   <p>ここから先は「ジャンプ命令」（プログラムでいうgoto）が何度も出てきます。バグの動きを左右する命令なので、先に説明します。</p>
   <figure class="fig">
     <h3>ジャンプ命令とは</h3>
@@ -384,40 +341,10 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <span class="by txt"><i>スクリプト番号 ＝ 1バイト目 × 256 ＋ 2バイト目</i><small>0x000〜0x3FF の1,024通り</small></span>
     </div>
     <ul class="plain small">
-      <li><b>呼び出し（<code>1B</code>）との違い</b>　呼び出しはメモを1枚積み、呼んだスクリプトが終わると元の続きに戻ります。ジャンプ命令はメモを積まず、いまのメモの中身を書き換えるだけなので、元のスクリプトには戻りません。プログラムでいえば、呼び出しが関数呼び出し、ジャンプ命令がgotoにあたります。</li>
       <li><b>書き換わるもの</b>　いまのメモの「読む場所」3バイト（下位・上位・バンク）と「終了位置」2バイトです。新しい値は、ROMの $1C:A620 から並んでいるスクリプトの一覧表を、スクリプト番号で引いて決まります。</li>
       <li><b>順番とかかる時間</b>　1バイト目を読む → 画面の更新を2フレーム待つ → 2バイト目を読む → メモを書き換える → 新しいスクリプトを読み始める、の順です。メモを書き換えるのは、2バイト目を読んだあとです。</li>
-      <li><b>本来の使われ方</b>　港に入ったときのイベントは <code>02 E8</code> で追い返しのスクリプト0x2E8に移ります。スクリプトの最後に <code>00 FF</code> と書いて、中身が「終了」だけのスクリプト0xFFに移って終わる、という使い方もあります。</li>
     </ul>
-    <div class="scroll"><table>
-      <thead><tr><th>命令</th><th>スクリプト番号</th><th>スクリプトの一覧表（$1C:A620〜）に書かれた値</th><th>読み始めるアドレス</th><th>出てくる場面</th></tr></thead>
-      <tbody>
-        <tr><td class="mono">00 FF</td><td class="mono">0x0FF</td><td class="mono">604E</td><td class="mono">$1A:E04E</td><td>スクリプト0x194の最後（本来の動き）</td></tr>
-        <tr><td class="mono">00 8F</td><td class="mono">0x08F</td><td class="mono">390A</td><td class="mono">$1A:B90A</td><td>バグで最初に起きるジャンプ（この章）</td></tr>
-        <tr><td class="mono">00 8B</td><td class="mono">0x08B</td><td class="mono">3819</td><td class="mono">$1A:B819</td><td>TASの1回目（7章）</td></tr>
-        <tr><td class="mono">00 A2</td><td class="mono">0x0A2</td><td class="mono">4098</td><td class="mono">$1A:C098</td><td>TASの2回目（7章）</td></tr>
-        <tr><td class="mono">02 A2</td><td class="mono">0x2A2</td><td class="mono">C669</td><td class="mono">$1B:C669</td><td>TASの3回目（7章）</td></tr>
-      </tbody>
-    </table></div>
-    <figcaption>「スクリプトの一覧表」は、ROMの $1C:A620 から並んでいる、スクリプトごとの先頭アドレスの表です。1つのスクリプトにつき2バイトで、スクリプト番号nの値は $1C:A620＋n×2 にあります（例：スクリプト0x8Fなら $1C:A73E）。スクリプトの終わりは、次の番号の値で決まります。値が8000未満ならバンク$1Aで、アドレスは値に8000を足したもの。8000以上ならバンク$1Bで、アドレスは値そのままです。スクリプト番号が0x36A以上のものはバンク$1Cにあります。</figcaption>
-    <h3>一覧表の引き方</h3>
-    <p class="small">一覧表は、スクリプト0x000から0x3FFまでの1,024個ぶんの値が、番号順に2バイトずつ1列に並んだものです（$1C:A620〜$1C:AE1F）。命令の2バイトは別々の番号ではなく、1つのスクリプト番号の上の桁と下の桁です。1バイト目を「行」、2バイト目を「列」とする4行×256列の表と考えても、同じ結果になります。</p>
-    <div class="scroll"><table>
-      <thead><tr><th>1バイト目（行）</th><th>2バイト目（列）</th><th>スクリプト番号</th><th>スクリプトがあるバンク</th></tr></thead>
-      <tbody>
-        <tr><td class="mono">00</td><td class="mono">00〜FF</td><td class="mono">0x000〜0x0FF</td><td class="mono">$1A</td></tr>
-        <tr><td class="mono">01</td><td class="mono">00〜98<br>99〜FF</td><td class="mono">0x100〜0x198<br>0x199〜0x1FF</td><td class="mono">$1A<br>$1B</td></tr>
-        <tr><td class="mono">02</td><td class="mono">00〜FF</td><td class="mono">0x200〜0x2FF</td><td class="mono">$1B</td></tr>
-        <tr><td class="mono">03</td><td class="mono">00〜69<br>6A〜FF</td><td class="mono">0x300〜0x369<br>0x36A〜0x3FF</td><td class="mono">$1B<br>$1C</td></tr>
-      </tbody>
-    </table></div>
-    <ul class="plain small">
-      <li><b>値の場所</b>　スクリプト番号nの値は $1C:A620＋n×2 にあります。<code>00 8F</code> なら n＝0x08F で、<wbr>$1C:A620＋0x11E＝$1C:A73E。そこに書かれた値は 390A です。</li>
-      <li><b>バンクの決め方</b>　一覧表の値は2バイトで、バンクは書かれていません。スクリプトは番号順に $1A → $1B → $1C と並んでいるので、番号と値から決めます。番号が0x36A以上なら $1C。それ未満なら、値が8000未満のとき $1A、8000以上のとき $1B です。境目の0x36Aという数は、一覧表の直前（$1C:A61E）に書かれています。</li>
-      <li><b>アドレスの作り方</b>　値の最上位ビットを立てたもの（8000未満なら8000を足したもの）が、バンク内のアドレスです。390A → $1A:B90A。</li>
-      <li><b>終了位置</b>　スクリプトは番号順に並んでいるので、次の番号の値（0x090の値 39CB → $1A:B9CB）が、そのままこのスクリプトの終わりになります。スクリプト0x08Fは $1A:B90A〜B9CA の193バイトです。</li>
-      <li><b>バグとの関係</b>　1バイト目（行）は、読み違えた先でたまたま命令として読まれた 00〜03 のどれかで決まります。2バイト目（列）としては、2フレームずれた先（512バイト手前。補正がある場合は別）のアドレスにある値が読まれます。ROMの値が書き換わるわけではなく、読む場所が変わります。押すタイミングで変わるのは、おもに「列」のほうです。</li>
-    </ul>
+    <p class="small muted">ジャンプと呼び出し（<code>1B</code>）の違い、本来の使われ方、ジャンプ先の実例の表は付録Aにあります。</p>
     <h3>バグ中にジャンプ命令が特別な働きをする理由</h3>
     <ul class="plain small">
       <li><b>2バイト目を、別の場所から読む</b>　1バイト目と2バイト目の間に2フレームたつので、12枚目のメモでは読む場所が512バイト手前にずれます（ずれた先がバンクの下半分に入る場合は補正がかかり、次のバンクの上半分になります）。2バイト目は、スクリプトに書かれた値ではなく、ずれた先にたまたまあった値になります。行き先のスクリプト番号が、押すタイミングで変わるということです。</li>
@@ -504,16 +431,90 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   <p><b>Xボタン</b>は、ボタン待ちを抜ける働きが違うのではありませんでした。ウィンドウを開く途中の特定の1フレームでXが押されていると、開く時間が1フレーム縮みます。12種類のボタンで試して、縮むのはXだけでした。1フレーム縮めば、その後の行き先が256バイト変わります。</p>
 </section>
 
+<section class="part" style="border-top:3px solid var(--accent);padding-top:18px">
+  <div class="eyebrow">第II部</div>
+  <h2 style="font-size:clamp(26px,5vw,36px)">TASはどう使ったか</h2>
+  <p class="small muted">7〜8章。7,279F版の経路と、ほかのエンディングの入口。</p>
+</section>
+
 <section>
-  <div class="eyebrow">7 ／ 応用</div>
-  <h2>TASは、本物のエンディングスクリプトの最後の2バイトを読ませている</h2>
+  <div class="eyebrow">7 ／ TASの経路</div>
+  <h2>7,279F版TASは、本物のエンディングスクリプトの最後の2バイトを読ませている</h2>
   <p>7,279F版は8回の押下と3回のジャンプで、エンディング演出のスクリプト（番号0x277）の最後にある <code>40 70</code>（エンディング開始）へ、ちょうど読む場所を合わせています。</p>
-  <p>エンディングの始め方は、仕組みの上で2通り考えられます。<b>① スクリプトの命令 <code>40 70</code> か <code>40 6F</code> を読ませる方法</b>と、<b>② スクリプトを経由せず、エンディングの処理を直接呼ばせる方法</b>です。実際に成功しているのは①だけで、この章の大部分は①の説明です。②は入口になりうる仕組みを確かめた段階で、章の最後にまとめます。</p>
   <figure class="fig">
     <div class="scroll"><svg id="tas" viewBox="0 0 720 330" width="720" role="img" aria-label="TASの経路。フレームごとの読む場所の推移"></svg></div>
     <div class="legend"><span style="--c:var(--accent)">バンク$1Aを読んでいる</span><span style="--c:var(--bank2)">バンク$1Bを読んでいる</span><span style="--c:var(--hot)">エンディング命令の場所</span></div>
     <figcaption>線が右下がりなのが「時計によるずれ」、垂直に跳ぶのが「ジャンプ命令」です。下の表の行を押すと、その時点に印が付きます。</figcaption>
   </figure>
+  <h3>概略版</h3>
+  <div class="scroll"><table id="tasTable">
+    <thead><tr><th>入力</th><th>読み始めた場所</th><th>起きたこと</th></tr></thead><tbody></tbody>
+  </table></div>
+  <details class="aside">
+    <summary>フレームごとの全記録を見る（詳細版：最初のAからエンディングまで）</summary>
+    <div>
+    <p class="small"><b>読む場所の決まり方</b>　次に読む場所は、直前に読んだ場所から次のように決まります。色つきの行が、その計算です。</p>
+    <ul class="plain small">
+      <li><b>上位バイト</b>＝直前に読んだ場所の上位バイト − その間にたったフレーム数（時計が1フレームに1ずつ減らすため）</li>
+      <li><b>下位バイト</b>＝直前に読んだ場所の下位バイト ＋ 1（1バイト読み進めるため）</li>
+      <li><b>ジャンプ命令のときだけ</b>、12枚目のメモの「読む場所」が、ジャンプ先スクリプトの先頭アドレスに書き換えられます。このアドレスはスクリプト番号から表で引かれ、時計とは関係ありません</li>
+      <li>同じフレームの中で続けて読む文字や命令は、読んだバイト数だけ下位バイトが進みます。文字は1つ1バイト、漢字は2バイト、命令は「命令の1バイト＋引数の数」です</li>
+    </ul>
+    <div class="scroll"><table>
+      <thead><tr><th>フレーム</th><th>入力</th><th>読む場所</th><th>読む場所の理由と、裏で起きていること</th></tr></thead>
+      <tbody>
+        <tr><td class="n">7,215</td><td><span class="tag a">A</span></td><td class="mono">$1A:A718</td><td><div class="why">直前のボタン待ちは $1A:B917（7,197Fに読んだ <code>12</code>）。そこから18フレーム（16進で12）たったので、上位は B9−12＝A7。下位はボタン待ちの次で 17＋1＝18</div>ボタン待ちを抜ける。「れたな！」の4文字を書いて4バイト進み（$1A:A718〜A71B）、次の $1A:A71C の <code>12</code> でボタン待ち</td></tr>
+        <tr><td class="n">7,216〜7,217</td><td></td><td></td><td class="muted">ボタン待ち</td></tr>
+        <tr><td class="n">7,218</td><td><span class="tag a">A</span></td><td class="mono">$1A:A41D</td><td><div class="why">直前のボタン待ちは $1A:A71C（7,215F）。3フレームたったので、上位は A7−3＝A4。下位は 1C＋1＝1D</div>「さか」（2バイト）、記号2つ（2バイト）、名前の表示 <code>2D BB</code>（2バイト）、漢字1文字（2バイト）、「が」（1バイト）、記号2つ（2バイト）で計11バイト進み、次の $1A:A428 の <code>12</code> でボタン待ち</td></tr>
+        <tr><td class="n">7,219〜7,220</td><td></td><td></td><td class="muted">ボタン待ち</td></tr>
+        <tr><td class="n">7,221</td><td><span class="tag a">A</span></td><td class="mono">$1A:A129</td><td><div class="why">直前のボタン待ちは $1A:A428（7,218F）。3フレームたったので、上位は A4−3＝A1。下位は 28＋1＝29</div>行送り <code>24</code>（1バイト）、記号を1つ書く <code>2F 28</code>（2バイト）、「ビ」（1バイト）で計4バイト進み、次の $1A:A12D でジャンプ命令の1バイト目 <code>00</code> を読む</td></tr>
+        <tr><td class="n">7,222</td><td></td><td></td><td class="muted">ジャンプの準備で待つ</td></tr>
+        <tr><td class="n">7,223</td><td></td><td class="mono">$1A:9F2E</td><td><div class="why">ジャンプ命令の1バイト目は $1A:A12D（7,221F）。2バイト目を読むまでに2フレームたったので、上位は A1−2＝9F。下位は 2D＋1＝2E。ここにあった値 8B がスクリプト番号になる。ジャンプ後の $1A:B819 はスクリプト0x8Bの先頭アドレスで、時計とは関係なく表から決まる</div>2バイト目として 8B を読む。<b class="cnt">スクリプト0x8B（$1A:B819）へジャンプする</b>。記号、空白、「あのおとぎばなしの」、記号の12文字を書いて12バイト進み、次の $1A:B825 の <code>12</code> でボタン待ち</td></tr>
+        <tr><td class="n">7,224〜7,226</td><td></td><td></td><td class="muted">ボタン待ち</td></tr>
+        <tr><td class="n">7,227</td><td><span class="tag a">A</span></td><td class="mono">$1A:B426</td><td><div class="why">直前のボタン待ちは $1A:B825（7,223F）。4フレームたったので、上位は B8−4＝B4。下位は 25＋1＝26</div>「ほうびを とらせよう」の10文字を書いて10バイト進み、次の $1A:B430 の <code>12</code> でボタン待ち</td></tr>
+        <tr><td class="n">7,228〜7,234</td><td></td><td></td><td class="muted">ボタン待ち</td></tr>
+        <tr><td class="n">7,235</td><td><span class="tag a">A</span></td><td class="mono">$1A:AC31</td><td><div class="why">直前のボタン待ちは $1A:B430（7,227F）。8フレームたったので、上位は B4−8＝AC。下位は 30＋1＝31</div>「ャ」を書いて1バイト進み、次の $1A:AC32 でジャンプ命令の1バイト目 <code>00</code> を読む</td></tr>
+        <tr><td class="n">7,236</td><td></td><td></td><td class="muted">ジャンプの準備で待つ</td></tr>
+        <tr><td class="n">7,237</td><td></td><td class="mono">$1A:AA33</td><td><div class="why">ジャンプ命令の1バイト目は $1A:AC32（7,235F）。2フレームたったので、上位は AC−2＝AA。下位は 32＋1＝33。ここにあった値 A2 がスクリプト番号になる。ジャンプ後の $1A:C098 はスクリプト0xA2の先頭アドレス</div>2バイト目として A2 を読む。<b class="cnt">スクリプト0xA2（$1A:C098）へジャンプする</b>。漢字を1文字書く（$1A:C098〜C099 の2バイト）</td></tr>
+        <tr><td class="n">7,238〜7,239</td><td></td><td></td><td class="muted">文字の表示に3フレームかかる（理由は未確認）</td></tr>
+        <tr><td class="n">7,240</td><td></td><td class="mono">$1A:BD9A</td><td><div class="why">直前に読んだのは漢字の2バイト目 $1A:C099（7,237F）。表示に3フレームかかったので、上位は C0−3＝BD。下位は 99＋1＝9A</div>「ち」（1バイト）、条件判定 <code>28 45 0E</code>（3バイト。判定の結果、次の2バイトも読み飛ばす）、条件判定 <code>28 42 0E</code>（同じく3バイトと、読み飛ばし2バイト）、名前の表示（2バイト）、「のため」（3バイト）、記号（1バイト）で計17バイト進み、次の $1A:BDAB の <code>11</code> でウィンドウを切り替える</td></tr>
+        <tr><td class="n">7,241</td><td></td><td></td><td class="muted">ウィンドウ切り替えで待つ</td></tr>
+        <tr><td class="n">7,242</td><td></td><td class="mono">$1A:BBAC</td><td><div class="why">直前に読んだのは $1A:BDAB の <code>11</code>（7,240F）。ウィンドウ切り替えの2フレームで、上位は BD−2＝BB。下位は AB＋1＝AC</div>記号を1つ読む（1バイト）。切り替え先のウィンドウが閉じているので、開き始める</td></tr>
+        <tr><td class="n">7,243〜7,246</td><td><span class="tag x">X</span> 7,244</td><td></td><td>ウィンドウを開いている最中。<b class="hot">7,244FのXで、6フレームかかるところが5フレームで済む</b></td></tr>
+        <tr><td class="n">7,247</td><td></td><td class="mono">$1A:B6AD</td><td><div class="why">直前に読んだのは $1A:BBAC の記号（7,242F）。ウィンドウを開くのに5フレームかかったので、上位は BB−5＝B6。下位は AC＋1＝AD。Xを押さなければ6フレームで、<wbr>$1A:B5AD になっていた</div>「ある」（2バイト）のあと、<code>1B 01 F8</code>（3バイト。$1A:B6AF〜B6B1）でスクリプト0x1F8（$1B:8A4D）を呼ぶ（13枚目のメモ）。13枚目では、条件判定 <code>28 40 0E</code>（3バイトと、読み飛ばし2バイト）、「の」（1バイト）、条件判定 <code>28 44 FF</code>（3バイト。読み飛ばしなし）で計9バイト進み、次の $1B:8A56 で <code>00 FF</code> の1バイト目を読む</td></tr>
+        <tr><td class="n">7,248</td><td></td><td></td><td class="muted">ジャンプの準備で待つ</td></tr>
+        <tr><td class="n">7,249</td><td></td><td class="mono">$1B:8A57</td><td><div class="why">ここは13枚目のメモで読んでいる。13枚目は時計と重なっていないので、2フレームたっても上位はずれず、1バイト目 $1B:8A56 のすぐ次を読む</div>2バイト目の FF を正しく読む。13枚目のメモは時計と重なっていないので、ずれない。空のスクリプト0xFFが終わり、12枚目に戻る</td></tr>
+        <tr><td class="n">7,250</td><td></td><td></td><td class="muted">戻る処理で待つ。13枚目にいた4フレームの間も、12枚目の読む場所はずれ続けている</td></tr>
+        <tr><td class="n">7,251</td><td></td><td class="mono">$1A:B2B2</td><td><div class="why">12枚目で最後に読んだのは、呼び出し命令の引数 $1A:B6B1（7,247F）。13枚目にいた間も含めて4フレームたったので、上位は B6−4＝B2。下位は B1＋1＝B2</div><code>11</code>（1バイト）でウィンドウを切り替える</td></tr>
+        <tr><td class="n">7,252</td><td></td><td></td><td class="muted">ウィンドウ切り替えで待つ</td></tr>
+        <tr><td class="n">7,253</td><td></td><td class="mono">$1A:B0B3</td><td><div class="why">直前に読んだのは $1A:B2B2 の <code>11</code>（7,251F）。2フレームたったので、上位は B2−2＝B0。下位は B2＋1＝B3</div>記号を1つ読む（1バイト）。閉じているウィンドウを開き始める</td></tr>
+        <tr><td class="n">7,254〜7,257</td><td><span class="tag x">X</span> 7,255</td><td></td><td>ウィンドウを開いている最中。<b class="hot">7,255FのXで、ここも5フレームで済む</b></td></tr>
+        <tr><td class="n">7,258</td><td></td><td class="mono">$1A:ABB4</td><td><div class="why">直前に読んだのは $1A:B0B3 の記号（7,253F）。ウィンドウを開くのに5フレームかかったので、上位は B0−5＝AB。下位は B3＋1＝B4。Xを押さなければ $1A:AAB4 になっていた</div>フラグの判定 <code>3A 1E 01</code>（3バイト。読み飛ばしなし）で3バイト進み、次の $1A:ABB7 でジャンプ命令の1バイト目 <code>02</code> を読む</td></tr>
+        <tr><td class="n">7,259</td><td></td><td></td><td class="muted">ジャンプの準備で待つ</td></tr>
+        <tr><td class="n">7,260</td><td></td><td class="mono">$1A:A9B8</td><td><div class="why">ジャンプ命令の1バイト目は $1A:ABB7（7,258F）。2フレームたったので、上位は AB−2＝A9。下位は B7＋1＝B8。ここにあった値 A2 と1バイト目の 02 を合わせて、スクリプト番号は 0x2A2。ジャンプ後の $1B:C669 はスクリプト0x2A2の先頭アドレス</div>2バイト目として A2 を読む。<b class="cnt">スクリプト0x2A2（$1B:C669）へジャンプし、バンク$1Bに入る</b>。名前の表示（2バイト）、「には 」（3バイト）、名前の表示（2バイト）、「という」（3バイト）で計10バイト進み、次の $1B:C673 の <code>10</code> でウィンドウを切り替える</td></tr>
+        <tr><td class="n">7,261</td><td></td><td></td><td class="muted">ウィンドウ切り替えで待つ</td></tr>
+        <tr><td class="n">7,262</td><td></td><td class="mono">$1B:C474</td><td><div class="why">直前に読んだのは $1B:C673 の <code>10</code>（7,260F）。2フレームたったので、上位は C6−2＝C4。下位は 73＋1＝74</div>「ん」を書く（1バイト。表示に2フレームかかる）</td></tr>
+        <tr><td class="n">7,263</td><td></td><td></td><td class="muted">文字の表示で待つ</td></tr>
+        <tr><td class="n">7,264</td><td></td><td class="mono">$1B:C275</td><td><div class="why">直前に読んだのは $1B:C474 の「ん」（7,262F）。表示に2フレームかかったので、上位は C4−2＝C2。下位は 74＋1＝75</div><code>12</code> でボタン待ち。下位バイトが75の位置で止まるのが、この経路の要点</td></tr>
+        <tr><td class="n">7,265〜7,277</td><td></td><td></td><td class="muted">ボタン待ち。上位がC2からB4まで減るのを待つ</td></tr>
+        <tr><td class="n">7,278</td><td><span class="tag a">A</span></td><td class="mono">$1B:B476</td><td><div class="why">直前のボタン待ちは $1B:C275（7,264F）。14フレーム（16進で0E）たったので、上位は C2−0E＝B4。下位は 75＋1＝76</div><b class="hot"><code>40 70</code> を読む。エンディング開始</b></td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>この間、画面はずっと真っ暗です。「」の中は、読まれたバイトを文字コード表で読み替えたものです。セリフの途中から読んでいるので、断片になっています。「記号」は文字コードF7・F9、「漢字」は3Fで始まる2バイトの文字で、どの字かは特定できていません。「名前の表示」は人物名などを差し込む命令です。灰色の行は「何も読まずに時計だけが進む」フレームで、そのフレーム数だけ次に読む場所が256バイトずつ手前へずれます。ジャンプ命令では、12枚目のメモの「読む場所」が、ジャンプ先スクリプトの先頭アドレスに書き換えられます。</figcaption>
+  </div>
+  </details>
+  <h3>暗転の裏側</h3>
+  <p>画面が真っ暗なのは、直前の演出で画面の明るさが0にされたままだからです。エミュレーターで明るさだけを元に戻すと、裏で描かれている画面が見えます。</p>
+  <figure class="fig">
+    <img id="blackout" alt="左は実際の画面で真っ暗。右は明るさだけを固定した画面で、港の地図とセリフのウィンドウが見え、ボタンを押すたびに文字が書き足されていく。" style="width:100%;image-rendering:pixelated;border-radius:6px" src="img/blackout.gif">
+    <figcaption>左が実際の画面、右が明るさだけを固定した画面です（7,140F〜7,330Fは1/4倍速、その後のエンディングは4倍速）。下の帯は入力で、上の段がA、下の段がX、白い線がいまのフレーム、色の濃い範囲が暗転中です。追い返しのセリフ「ここは だめだ！ ゴドンゴにまわろう」のウィンドウが残ったまま、ボタンを押すたびに、読み違えたスクリプトの文字がその続きに書き足されていきます。「ありがとう しんじてたよ」「イスマス城が‥‥」「あのおとぎばなしの」「騎士団のため」と、別々のセリフの断片が並び、行が送られます。7,264Fには2つ目のウィンドウが開いて「ん」と出ます（上の表の7,264Fの行）。7,278FのAでエンディングに入ると、実際の画面がまだ暗いうちから、背景がすでに描かれています。明るさを固定しても、暗転中を含む7,289Fまでのほぼ全フレームで、ゲーム内のメモリは実際のTASと一致しました。違いが出たのは、エンディングに入った直後の2フレームの数バイトだけです。</figcaption>
+  </figure>
+</section>
+
+<section>
+  <div class="eyebrow">8 ／ ほかの入口</div>
+  <h2>エンディングの入口は、ほかにもある</h2>
+  <p>エンディングの始め方は、仕組みの上で2通り考えられます。<b>方法① スクリプトの命令 <code>40 70</code> か <code>40 6F</code> を読ませる</b>と、<b>方法② スクリプトを経由せず、エンディングの処理を直接呼ばせる</b>です。TASが使ったのは方法①で、狙える場所は $1B:B476 のほかにもいくつもあります。この章では、方法①で狙える場所と、実際に届いた経路をまとめます。方法②はまだ成功していないので、11章の研究課題に回します。</p>
   <figure class="fig">
     <h3>方法①：エンディングを呼ぶ条件</h3>
     <p class="small">エンディングを始める副命令は2つあり、どちらを読ませても入力なしでエンディングの最後まで進みます。</p>
@@ -567,84 +568,16 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     </table></div>
     <figcaption>「最後の入力」は、発火（12枚目のメモが書き換わるフレーム、TASでは7,195F）を0として数えたフレームです。TASの行に添えたフレームと「TASでは」の値は、入力ファイルの行の番号（0始まり）です。<code>40 70</code> の経路は、どれも最後のAを押したフレーム、または数フレーム後にエンディングの処理（<span class="mono">$03:8D63</span>）へ入ることを、最初から通しで実行して確かめました。<code>40 6F</code> の経路（$1A:BB57）は、7,290Fに <code>40</code> を読んでエピローグから始まり、エンディングの処理に入るのは8,006Fです。この経路は、別のチャットで行った探索の結果を、こちらで通しで実行して確かめたものです。押し方の欄で「文章の途中で X」とあるのは、ボタン待ちではなく、文字を書いている途中で押すもの（TASの7,244F・7,255F）です。$1B:AE33 へ入る経路は押下が3回で、見つかっている中で最も少ない操作です。$1B:B1BE の経路は、ランダムに押した試行でたまたま見つかったものを、必要な押下だけに絞りました。</figcaption>
   </figure>
-  <figure class="fig">
-    <h3>方法②：処理スクリプトの命令から直接呼ぶ（未確認）</h3>
-    <p class="small"><code>40 70</code> と <code>40 6F</code> の処理は、中でそれぞれ <span class="mono">$03:800F</span>・<span class="mono">$03:800C</span> を呼んでいるだけです。スクリプトとは別に、番地を指定してプログラムを呼び出せる仕組みがあれば、<code>40</code> を読ませなくてもエンディングは始まります。その仕組みが「処理スクリプト」（補足「処理スクリプトと暴走」）の3番の命令です。</p>
-    <div class="scroll"><table>
-      <thead><tr><th>分かっていること</th><th>分かっていないこと</th></tr></thead>
-      <tbody>
-        <tr><td>処理スクリプトが <span class="mono">（下位5ビットが3の値）0F 80 03</span> の4バイトを読めば、エンディングの処理が呼ばれる</td><td>この4バイトの並びを、処理スクリプトに読ませる方法</td></tr>
-        <tr><td>ROMの中に <span class="mono">0F 80 03</span>・<span class="mono">0C 80 03</span> は7か所あるが、直前のバイトが条件に合うものも、処理スクリプトが読むバンク$1Dにあるものもない</td><td>RAMにこの並びを作れるか</td></tr>
-        <tr><td>スクリプトの命令 <code>1E</code> の引数（処理スクリプトの番号）がでたらめだと、処理スクリプトをRAMなどROMの外から読み始める。256個の番号のうち93個がRAMを指す</td><td>狙った番号の <code>1E</code> を読ませ、狙ったRAMの場所から読ませられるか</td></tr>
-      </tbody>
-    </table></div>
-    <figcaption>メモの先頭3バイトは「読む場所」なので、<span class="mono">$03:800F</span> を指すメモがあれば、そこがちょうど <span class="mono">0F 80 03</span> の並びになります。12枚目のメモは時計で値が変わりますが、バンクが$03まで下がるには約5,900フレームかかるので、この形では7,279Fより早くなりません。いまのところ、方法②の成功例はありません。</figcaption>
-  </figure>
-  <h3>概略版</h3>
-  <div class="scroll"><table id="tasTable">
-    <thead><tr><th>入力</th><th>読み始めた場所</th><th>起きたこと</th></tr></thead><tbody></tbody>
-  </table></div>
-  <figure class="fig">
-    <h3>詳細版：最初のAからエンディングまで、フレームごと</h3>
-    <p class="small"><b>読む場所の決まり方</b>　次に読む場所は、直前に読んだ場所から次のように決まります。色つきの行が、その計算です。</p>
-    <ul class="plain small">
-      <li><b>上位バイト</b>＝直前に読んだ場所の上位バイト − その間にたったフレーム数（時計が1フレームに1ずつ減らすため）</li>
-      <li><b>下位バイト</b>＝直前に読んだ場所の下位バイト ＋ 1（1バイト読み進めるため）</li>
-      <li><b>ジャンプ命令のときだけ</b>、12枚目のメモの「読む場所」が、ジャンプ先スクリプトの先頭アドレスに書き換えられます。このアドレスはスクリプト番号から表で引かれ、時計とは関係ありません</li>
-      <li>同じフレームの中で続けて読む文字や命令は、読んだバイト数だけ下位バイトが進みます。文字は1つ1バイト、漢字は2バイト、命令は「命令の1バイト＋引数の数」です</li>
-    </ul>
-    <div class="scroll"><table>
-      <thead><tr><th>フレーム</th><th>入力</th><th>読む場所</th><th>読む場所の理由と、裏で起きていること</th></tr></thead>
-      <tbody>
-        <tr><td class="n">7,215</td><td><span class="tag a">A</span></td><td class="mono">$1A:A718</td><td><div class="why">直前のボタン待ちは $1A:B917（7,197Fに読んだ <code>12</code>）。そこから18フレーム（16進で12）たったので、上位は B9−12＝A7。下位はボタン待ちの次で 17＋1＝18</div>ボタン待ちを抜ける。「れたな！」の4文字を書いて4バイト進み（$1A:A718〜A71B）、次の $1A:A71C の <code>12</code> でボタン待ち</td></tr>
-        <tr><td class="n">7,216〜7,217</td><td></td><td></td><td class="muted">ボタン待ち</td></tr>
-        <tr><td class="n">7,218</td><td><span class="tag a">A</span></td><td class="mono">$1A:A41D</td><td><div class="why">直前のボタン待ちは $1A:A71C（7,215F）。3フレームたったので、上位は A7−3＝A4。下位は 1C＋1＝1D</div>「さか」（2バイト）、記号2つ（2バイト）、名前の表示 <code>2D BB</code>（2バイト）、漢字1文字（2バイト）、「が」（1バイト）、記号2つ（2バイト）で計11バイト進み、次の $1A:A428 の <code>12</code> でボタン待ち</td></tr>
-        <tr><td class="n">7,219〜7,220</td><td></td><td></td><td class="muted">ボタン待ち</td></tr>
-        <tr><td class="n">7,221</td><td><span class="tag a">A</span></td><td class="mono">$1A:A129</td><td><div class="why">直前のボタン待ちは $1A:A428（7,218F）。3フレームたったので、上位は A4−3＝A1。下位は 28＋1＝29</div>行送り <code>24</code>（1バイト）、記号を1つ書く <code>2F 28</code>（2バイト）、「ビ」（1バイト）で計4バイト進み、次の $1A:A12D でジャンプ命令の1バイト目 <code>00</code> を読む</td></tr>
-        <tr><td class="n">7,222</td><td></td><td></td><td class="muted">ジャンプの準備で待つ</td></tr>
-        <tr><td class="n">7,223</td><td></td><td class="mono">$1A:9F2E</td><td><div class="why">ジャンプ命令の1バイト目は $1A:A12D（7,221F）。2バイト目を読むまでに2フレームたったので、上位は A1−2＝9F。下位は 2D＋1＝2E。ここにあった値 8B がスクリプト番号になる。ジャンプ後の $1A:B819 はスクリプト0x8Bの先頭アドレスで、時計とは関係なく表から決まる</div>2バイト目として 8B を読む。<b class="cnt">スクリプト0x8B（$1A:B819）へジャンプする</b>。記号、空白、「あのおとぎばなしの」、記号の12文字を書いて12バイト進み、次の $1A:B825 の <code>12</code> でボタン待ち</td></tr>
-        <tr><td class="n">7,224〜7,226</td><td></td><td></td><td class="muted">ボタン待ち</td></tr>
-        <tr><td class="n">7,227</td><td><span class="tag a">A</span></td><td class="mono">$1A:B426</td><td><div class="why">直前のボタン待ちは $1A:B825（7,223F）。4フレームたったので、上位は B8−4＝B4。下位は 25＋1＝26</div>「ほうびを とらせよう」の10文字を書いて10バイト進み、次の $1A:B430 の <code>12</code> でボタン待ち</td></tr>
-        <tr><td class="n">7,228〜7,234</td><td></td><td></td><td class="muted">ボタン待ち</td></tr>
-        <tr><td class="n">7,235</td><td><span class="tag a">A</span></td><td class="mono">$1A:AC31</td><td><div class="why">直前のボタン待ちは $1A:B430（7,227F）。8フレームたったので、上位は B4−8＝AC。下位は 30＋1＝31</div>「ャ」を書いて1バイト進み、次の $1A:AC32 でジャンプ命令の1バイト目 <code>00</code> を読む</td></tr>
-        <tr><td class="n">7,236</td><td></td><td></td><td class="muted">ジャンプの準備で待つ</td></tr>
-        <tr><td class="n">7,237</td><td></td><td class="mono">$1A:AA33</td><td><div class="why">ジャンプ命令の1バイト目は $1A:AC32（7,235F）。2フレームたったので、上位は AC−2＝AA。下位は 32＋1＝33。ここにあった値 A2 がスクリプト番号になる。ジャンプ後の $1A:C098 はスクリプト0xA2の先頭アドレス</div>2バイト目として A2 を読む。<b class="cnt">スクリプト0xA2（$1A:C098）へジャンプする</b>。漢字を1文字書く（$1A:C098〜C099 の2バイト）</td></tr>
-        <tr><td class="n">7,238〜7,239</td><td></td><td></td><td class="muted">文字の表示に3フレームかかる（理由は未確認）</td></tr>
-        <tr><td class="n">7,240</td><td></td><td class="mono">$1A:BD9A</td><td><div class="why">直前に読んだのは漢字の2バイト目 $1A:C099（7,237F）。表示に3フレームかかったので、上位は C0−3＝BD。下位は 99＋1＝9A</div>「ち」（1バイト）、条件判定 <code>28 45 0E</code>（3バイト。判定の結果、次の2バイトも読み飛ばす）、条件判定 <code>28 42 0E</code>（同じく3バイトと、読み飛ばし2バイト）、名前の表示（2バイト）、「のため」（3バイト）、記号（1バイト）で計17バイト進み、次の $1A:BDAB の <code>11</code> でウィンドウを切り替える</td></tr>
-        <tr><td class="n">7,241</td><td></td><td></td><td class="muted">ウィンドウ切り替えで待つ</td></tr>
-        <tr><td class="n">7,242</td><td></td><td class="mono">$1A:BBAC</td><td><div class="why">直前に読んだのは $1A:BDAB の <code>11</code>（7,240F）。ウィンドウ切り替えの2フレームで、上位は BD−2＝BB。下位は AB＋1＝AC</div>記号を1つ読む（1バイト）。切り替え先のウィンドウが閉じているので、開き始める</td></tr>
-        <tr><td class="n">7,243〜7,246</td><td><span class="tag x">X</span> 7,244</td><td></td><td>ウィンドウを開いている最中。<b class="hot">7,244FのXで、6フレームかかるところが5フレームで済む</b></td></tr>
-        <tr><td class="n">7,247</td><td></td><td class="mono">$1A:B6AD</td><td><div class="why">直前に読んだのは $1A:BBAC の記号（7,242F）。ウィンドウを開くのに5フレームかかったので、上位は BB−5＝B6。下位は AC＋1＝AD。Xを押さなければ6フレームで、<wbr>$1A:B5AD になっていた</div>「ある」（2バイト）のあと、<code>1B 01 F8</code>（3バイト。$1A:B6AF〜B6B1）でスクリプト0x1F8（$1B:8A4D）を呼ぶ（13枚目のメモ）。13枚目では、条件判定 <code>28 40 0E</code>（3バイトと、読み飛ばし2バイト）、「の」（1バイト）、条件判定 <code>28 44 FF</code>（3バイト。読み飛ばしなし）で計9バイト進み、次の $1B:8A56 で <code>00 FF</code> の1バイト目を読む</td></tr>
-        <tr><td class="n">7,248</td><td></td><td></td><td class="muted">ジャンプの準備で待つ</td></tr>
-        <tr><td class="n">7,249</td><td></td><td class="mono">$1B:8A57</td><td><div class="why">ここは13枚目のメモで読んでいる。13枚目は時計と重なっていないので、2フレームたっても上位はずれず、1バイト目 $1B:8A56 のすぐ次を読む</div>2バイト目の FF を正しく読む。13枚目のメモは時計と重なっていないので、ずれない。空のスクリプト0xFFが終わり、12枚目に戻る</td></tr>
-        <tr><td class="n">7,250</td><td></td><td></td><td class="muted">戻る処理で待つ。13枚目にいた4フレームの間も、12枚目の読む場所はずれ続けている</td></tr>
-        <tr><td class="n">7,251</td><td></td><td class="mono">$1A:B2B2</td><td><div class="why">12枚目で最後に読んだのは、呼び出し命令の引数 $1A:B6B1（7,247F）。13枚目にいた間も含めて4フレームたったので、上位は B6−4＝B2。下位は B1＋1＝B2</div><code>11</code>（1バイト）でウィンドウを切り替える</td></tr>
-        <tr><td class="n">7,252</td><td></td><td></td><td class="muted">ウィンドウ切り替えで待つ</td></tr>
-        <tr><td class="n">7,253</td><td></td><td class="mono">$1A:B0B3</td><td><div class="why">直前に読んだのは $1A:B2B2 の <code>11</code>（7,251F）。2フレームたったので、上位は B2−2＝B0。下位は B2＋1＝B3</div>記号を1つ読む（1バイト）。閉じているウィンドウを開き始める</td></tr>
-        <tr><td class="n">7,254〜7,257</td><td><span class="tag x">X</span> 7,255</td><td></td><td>ウィンドウを開いている最中。<b class="hot">7,255FのXで、ここも5フレームで済む</b></td></tr>
-        <tr><td class="n">7,258</td><td></td><td class="mono">$1A:ABB4</td><td><div class="why">直前に読んだのは $1A:B0B3 の記号（7,253F）。ウィンドウを開くのに5フレームかかったので、上位は B0−5＝AB。下位は B3＋1＝B4。Xを押さなければ $1A:AAB4 になっていた</div>フラグの判定 <code>3A 1E 01</code>（3バイト。読み飛ばしなし）で3バイト進み、次の $1A:ABB7 でジャンプ命令の1バイト目 <code>02</code> を読む</td></tr>
-        <tr><td class="n">7,259</td><td></td><td></td><td class="muted">ジャンプの準備で待つ</td></tr>
-        <tr><td class="n">7,260</td><td></td><td class="mono">$1A:A9B8</td><td><div class="why">ジャンプ命令の1バイト目は $1A:ABB7（7,258F）。2フレームたったので、上位は AB−2＝A9。下位は B7＋1＝B8。ここにあった値 A2 と1バイト目の 02 を合わせて、スクリプト番号は 0x2A2。ジャンプ後の $1B:C669 はスクリプト0x2A2の先頭アドレス</div>2バイト目として A2 を読む。<b class="cnt">スクリプト0x2A2（$1B:C669）へジャンプし、バンク$1Bに入る</b>。名前の表示（2バイト）、「には 」（3バイト）、名前の表示（2バイト）、「という」（3バイト）で計10バイト進み、次の $1B:C673 の <code>10</code> でウィンドウを切り替える</td></tr>
-        <tr><td class="n">7,261</td><td></td><td></td><td class="muted">ウィンドウ切り替えで待つ</td></tr>
-        <tr><td class="n">7,262</td><td></td><td class="mono">$1B:C474</td><td><div class="why">直前に読んだのは $1B:C673 の <code>10</code>（7,260F）。2フレームたったので、上位は C6−2＝C4。下位は 73＋1＝74</div>「ん」を書く（1バイト。表示に2フレームかかる）</td></tr>
-        <tr><td class="n">7,263</td><td></td><td></td><td class="muted">文字の表示で待つ</td></tr>
-        <tr><td class="n">7,264</td><td></td><td class="mono">$1B:C275</td><td><div class="why">直前に読んだのは $1B:C474 の「ん」（7,262F）。表示に2フレームかかったので、上位は C4−2＝C2。下位は 74＋1＝75</div><code>12</code> でボタン待ち。下位バイトが75の位置で止まるのが、この経路の要点</td></tr>
-        <tr><td class="n">7,265〜7,277</td><td></td><td></td><td class="muted">ボタン待ち。上位がC2からB4まで減るのを待つ</td></tr>
-        <tr><td class="n">7,278</td><td><span class="tag a">A</span></td><td class="mono">$1B:B476</td><td><div class="why">直前のボタン待ちは $1B:C275（7,264F）。14フレーム（16進で0E）たったので、上位は C2−0E＝B4。下位は 75＋1＝76</div><b class="hot"><code>40 70</code> を読む。エンディング開始</b></td></tr>
-      </tbody>
-    </table></div>
-    <figcaption>この間、画面はずっと真っ暗です。「」の中は、読まれたバイトを文字コード表で読み替えたものです。セリフの途中から読んでいるので、断片になっています。「記号」は文字コードF7・F9、「漢字」は3Fで始まる2バイトの文字で、どの字かは特定できていません。「名前の表示」は人物名などを差し込む命令です。灰色の行は「何も読まずに時計だけが進む」フレームで、そのフレーム数だけ次に読む場所が256バイトずつ手前へずれます。ジャンプ命令では、12枚目のメモの「読む場所」が、ジャンプ先スクリプトの先頭アドレスに書き換えられます。</figcaption>
-  </figure>
-  <h3>暗転の裏側</h3>
-  <p>画面が真っ暗なのは、直前の演出で画面の明るさが0にされたままだからです。エミュレーターで明るさだけを元に戻すと、裏で描かれている画面が見えます。</p>
-  <figure class="fig">
-    <img id="blackout" alt="左は実際の画面で真っ暗。右は明るさだけを固定した画面で、港の地図とセリフのウィンドウが見え、ボタンを押すたびに文字が書き足されていく。" style="width:100%;image-rendering:pixelated;border-radius:6px" src="img/blackout.gif">
-    <figcaption>左が実際の画面、右が明るさだけを固定した画面です（7,140F〜7,330Fは1/4倍速、その後のエンディングは4倍速）。下の帯は入力で、上の段がA、下の段がX、白い線がいまのフレーム、色の濃い範囲が暗転中です。追い返しのセリフ「ここは だめだ！ ゴドンゴにまわろう」のウィンドウが残ったまま、ボタンを押すたびに、読み違えたスクリプトの文字がその続きに書き足されていきます。「ありがとう しんじてたよ」「イスマス城が‥‥」「あのおとぎばなしの」「騎士団のため」と、別々のセリフの断片が並び、行が送られます。7,264Fには2つ目のウィンドウが開いて「ん」と出ます（上の表の7,264Fの行）。7,278FのAでエンディングに入ると、実際の画面がまだ暗いうちから、背景がすでに描かれています。明るさを固定しても、暗転中を含む7,289Fまでのほぼ全フレームで、ゲーム内のメモリは実際のTASと一致しました。違いが出たのは、エンディングに入った直後の2フレームの数バイトだけです。</figcaption>
-  </figure>
+</section>
+
+<section class="part" style="border-top:3px solid var(--accent);padding-top:18px">
+  <div class="eyebrow">第III部</div>
+  <h2 style="font-size:clamp(26px,5vw,36px)">さらに分かったこと</h2>
+  <p class="small muted">9〜11章。研究で分かった細かな仕組みと、残っている課題。</p>
 </section>
 
 <section>
-  <div class="eyebrow">補足 ／ メモの裏側</div>
+  <div class="eyebrow">9 ／ メモの裏側</div>
   <h2>メモは、12枚目以外も壊れる。枚数の数字もあてにならない</h2>
   <p>ここまでは12枚目のメモと時計の重なりだけを見てきました。バグを起こしたあと自由に操作した記録を調べると、メモのまわりではほかにも3つのことが起きていました。エンディングへの最短手順には関係しませんが、バグ中の「変な挙動」の多くはこれで説明できます。</p>
 
@@ -696,7 +629,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
 </section>
 
 <section>
-  <div class="eyebrow">補足 ／ 処理スクリプトと暴走</div>
+  <div class="eyebrow">10 ／ 処理スクリプトと暴走</div>
   <h2>スクリプトの裏に、もう1つのスクリプトがある</h2>
   <p>イベントのスクリプトにも、マップ移動（<code>05</code>〜<code>08</code>）やフラグの操作、フィールド側の処理の呼び出し（<code>04</code>〜<code>0F</code>）など、自分で行う命令はあります。一方で、変数を使った計算や分岐、音の処理など一部のゲーム本体の処理は、命令 <code>1E</code> で<b>処理スクリプト</b>という別のスクリプトを呼び出して任せます。イベントのスクリプトがセリフと進行の台本なら、処理スクリプトは、変数を整えて本体の処理を動かす裏方です。レイディバグ中の暴走は、ほとんどがここで起きます。</p>
 
@@ -748,12 +681,25 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
 </section>
 
 <section>
-  <div class="eyebrow">8 ／ 限界</div>
-  <h2>できないことと、まだ分かっていないこと</h2>
+  <div class="eyebrow">11 ／ 未解決の課題</div>
+  <h2>できないこと、まだ分かっていないこと</h2>
+  <figure class="fig">
+    <h3>研究課題：処理スクリプトの命令からエンディングを直接呼ぶ（方法②）</h3>
+    <p class="small"><code>40 70</code> と <code>40 6F</code> の処理は、中でそれぞれ <span class="mono">$03:800F</span>・<span class="mono">$03:800C</span> を呼んでいるだけです。スクリプトとは別に、番地を指定してプログラムを呼び出せる仕組みがあれば、<code>40</code> を読ませなくてもエンディングは始まります。その仕組みが「処理スクリプト」（10章「処理スクリプトと暴走」）の3番の命令です。</p>
+    <div class="scroll"><table>
+      <thead><tr><th>分かっていること</th><th>分かっていないこと</th></tr></thead>
+      <tbody>
+        <tr><td>処理スクリプトが <span class="mono">（下位5ビットが3の値）0F 80 03</span> の4バイトを読めば、エンディングの処理が呼ばれる</td><td>この4バイトの並びを、処理スクリプトに読ませる方法</td></tr>
+        <tr><td>ROMの中に <span class="mono">0F 80 03</span>・<span class="mono">0C 80 03</span> は7か所あるが、直前のバイトが条件に合うものも、処理スクリプトが読むバンク$1Dにあるものもない</td><td>RAMにこの並びを作れるか</td></tr>
+        <tr><td>スクリプトの命令 <code>1E</code> の引数（処理スクリプトの番号）がでたらめだと、処理スクリプトをRAMなどROMの外から読み始める。256個の番号のうち93個がRAMを指す</td><td>狙った番号の <code>1E</code> を読ませ、狙ったRAMの場所から読ませられるか</td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>メモの先頭3バイトは「読む場所」なので、<span class="mono">$03:800F</span> を指すメモがあれば、そこがちょうど <span class="mono">0F 80 03</span> の並びになります。12枚目のメモは時計で値が変わりますが、バンクが$03まで下がるには約5,900フレームかかるので、この形では7,279Fより早くなりません。いまのところ、方法②の成功例はありません。</figcaption>
+  </figure>
   <div class="row">
     <div><h3>できないこと（今回調べた仕組みの範囲で）</h3><ul class="plain small">
       <li>読む場所を自由に指定すること。今回調べた経路で結果を変えられたのは「何フレーム目に押すか」と「Xを使うか」だけでした。</li>
-      <li>メモの読む場所にRAMを指させて、RAMの内容（名前や所持品）をスクリプトの命令として実行させること。メモの読む場所は常にROMの中に補正されます。（処理スクリプトは別で、番号によってはRAMから読みます。補足「処理スクリプトと暴走」）</li>
+      <li>メモの読む場所にRAMを指させて、RAMの内容（名前や所持品）をスクリプトの命令として実行させること。メモの読む場所は常にROMの中に補正されます。（処理スクリプトは別で、番号によってはRAMから読みます。10章「処理スクリプトと暴走」）</li>
       <li>この追い返しの繰り返しで、9回以下で起こすこと。12枚目に達して初めて時計と重なります。ほかの方法でメモを12枚目まで積めるかどうかは調べていません。</li>
     </ul></div>
     <div><h3>未確認</h3><ul class="plain small">
@@ -767,11 +713,119 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
 </section>
 
 <section>
-  <div class="eyebrow">9 ／ 確認</div>
+  <div class="eyebrow">確認</div>
   <h2>理解度チェック：まちがえやすい10問</h2>
   <p>文が正しければ○、まちがっていれば×を選んでください。選ぶと、答えと理由が出ます。</p>
   <ol class="quiz" id="quiz"></ol>
   <div class="btns"><span class="score" id="qScore" aria-live="polite">0 / 10 問に回答</span><button id="qReset">やり直す</button></div>
+</section>
+
+<section class="part" style="border-top:3px solid var(--accent);padding-top:18px">
+  <div class="eyebrow">付録</div>
+  <h2 style="font-size:clamp(26px,5vw,36px)">技術資料</h2>
+  <p class="small muted">本文から外した詳しい解析です。本編を読むのに必要ではありません。</p>
+</section>
+
+<section>
+  <div class="eyebrow">付録A ／ 技術資料</div>
+  <h2>スクリプト0x194とスクリプトの一覧表</h2>
+  <p class="small muted">5章の出来事を、命令の並びとアドレスの計算まで確かめたい人向けの資料です。</p>
+  <figure class="fig">
+    <h3>スクリプト0x194の本来の中身（$1A:FF48〜FFAF、104バイト）</h3>
+    <p class="small">主人公ごとに違う曲番号を選んで鳴らすためのスクリプトです。同じ形のブロックが主人公の数だけ並んでいます。1ブロックは14バイトで、次の5つの命令でできています。</p>
+    <div class="bytes">
+      <span class="by cmd"><i>47 17 01 vv</i><small>曲番号vvを$1701に書く</small></span>
+      <span class="by cmd"><i>28 4n 0E</i><small>条件判定</small></span>
+      <span class="by cmd"><i>1E 0B</i><small>演出0x0B</small></span>
+      <span class="by cmd"><i>28 4n 0E</i><small>条件判定</small></span>
+      <span class="by call"><i>00 FF</i><small>スクリプト0xFFへジャンプ＝終了</small></span>
+    </div>
+    <h3>条件判定 <span class="mono">28 a b</span> の読み方</h3>
+    <ul class="plain small">
+      <li><b>1つ目の引数 a</b>　調べる変数の番号です。変数は $109D から並んでいて、1つが4ビット（0〜F の16通り）です。番号 a の変数は、$109D＋a÷2 のバイトの、a が偶数なら上位4ビット、奇数なら下位4ビットにあります。</li>
+      <li><b>2つ目の引数 b</b>　値の範囲です。上位4ビットが下限、下位4ビットが上限を表します。<span class="mono">0E</span> なら「0以上E以下」です。</li>
+      <li><b>働き</b>　変数の値が範囲に入っていれば、次の2バイトを読み飛ばします。入っていなければ、何もせず次へ進みます。</li>
+    </ul>
+    <p class="small"><span class="mono">28 43 0E</span> は「変数0x43の値が0〜Eなら、次の2バイトを飛ばす」です。飛ばされないのは値がFのときだけなので、「変数0x43がFのときだけ、次の命令を実行する」という意味になります。ホークが主人公のとき、変数0x40〜0x47のうちFになっているのは0x43だけでした。</p>
+    <div class="scroll"><table class="path">
+      <thead><tr><th>ブロック</th><th>場所</th><th>曲番号を書く</th><th>条件判定</th><th>変数がFのときだけ読む</th><th>条件判定</th><th>変数がFのときだけ読む</th></tr></thead>
+      <tbody>
+        <tr><td class="n">1</td><td class="mono">$1A:FF48〜</td><td class="mono rd">47 17 01 1F</td><td class="mono rd">28 40 0E</td><td class="mono sk">1E 0B</td><td class="mono rd">28 40 0E</td><td class="mono sk">00 FF</td></tr>
+        <tr><td class="n">2</td><td class="mono">$1A:FF56〜</td><td class="mono rd">47 17 01 17</td><td class="mono rd">28 41 0E</td><td class="mono sk">1E 0B</td><td class="mono rd">28 41 0E</td><td class="mono sk">00 FF</td></tr>
+        <tr><td class="n">3</td><td class="mono">$1A:FF64〜</td><td class="mono rd">47 17 01 10</td><td class="mono rd">28 42 0E</td><td class="mono sk">1E 0B</td><td class="mono rd">28 42 0E</td><td class="mono sk">00 FF</td></tr>
+        <tr><td class="n">4<br><b style="font-family:var(--f-body);font-size:12px">ホーク</b></td><td class="mono">$1A:FF72〜</td><td class="mono rd">47 17 01 09</td><td class="mono rd">28 43 0E</td><td class="mono rd">1E 0B</td><td class="mono rd">28 43 0E</td><td class="mono rd">00 <span class="late">FF</span></td></tr>
+        <tr><td class="n">5</td><td class="mono un">$1A:FF80〜</td><td class="mono un">47 17 01 01</td><td class="mono un">28 44 0E</td><td class="mono un">1E 0B</td><td class="mono un">28 44 0E</td><td class="mono un">00 FF</td></tr>
+        <tr><td class="n">6</td><td class="mono un">$1A:FF8E〜</td><td class="mono un">47 17 01 07</td><td class="mono un">28 45 0E</td><td class="mono un">1E 0B</td><td class="mono un">28 45 0E</td><td class="mono un">00 FF</td></tr>
+        <tr><td class="n">7</td><td class="mono un">$1A:FF9C〜</td><td class="mono un">47 17 01 0B</td><td class="mono un">28 46 0E</td><td class="mono un">1E 0B</td><td class="mono un">28 46 0E</td><td class="mono un">00 FF</td></tr>
+        <tr><td class="n">8</td><td class="mono un">$1A:FFAA〜</td><td class="mono un">47 17 01 14</td><td class="un">なし</td><td class="mono un">1E 0B</td><td class="un">なし</td><td class="un">なし</td></tr>
+      </tbody>
+    </table></div>
+    <div class="legend"><span style="--c:var(--win)">ホークが主人公のときに読まれる命令</span><span style="--c:var(--hot)">2フレーム後に読まれるバイト</span><span style="--c:transparent;text-decoration:line-through">読み飛ばされる命令</span><span style="--c:transparent;opacity:.45">そこまで進まない命令</span></div>
+    <p class="small">左から右へ、スクリプトに書かれている順番どおりに並べています。色の付いたところを左上から順にたどると、ホークが主人公のときに実際に読まれる道筋になります。1〜3番目のブロックでは、変数（0x40〜0x42）がFではないので、<span class="mono">1E 0B</span> と <span class="mono">00 FF</span> は読み飛ばされます。4番目のブロックでは変数0x43がFなので、5つの命令がすべて読まれ、<span class="mono">00 FF</span> で終わります。<b>色の付いた部分は、最後の1バイトを除いて、同じフレームのうちに一気に読まれます。赤で囲んだ最後の <span class="mono">FF</span> だけは、<span class="mono">00</span> を読んだ2フレーム後に読まれます。</b>レイディバグでは、この2フレームの間に読む場所がずれます。5番目以降には進みません。主人公が違えば、色の付く範囲が変わります。8番目のブロックには条件判定がなく、<span class="mono">1E 0B</span> を必ず読んで、そこでスクリプトの終わりに達します。</p>
+    <h3>4番目のブロックのアドレス</h3>
+    <div class="bytes">
+      <span class="by cmd"><i>47 17 01 09</i><small>$1A:FF72〜FF75</small></span>
+      <span class="by cmd"><i>28 43 0E</i><small>FF76〜FF78</small></span>
+      <span class="by cmd"><i>1E 0B</i><small>FF79〜FF7A</small></span>
+      <span class="by cmd"><i>28 43 0E</i><small>FF7B〜FF7D</small></span>
+      <span class="by call"><i>00</i><small>FF7E（7,195Fに読む）</small></span>
+      <span class="by bad"><i>FF</i><small>FF7F（本来は7,197Fに読む）</small></span>
+    </div>
+    <p class="small">10回目の追い返しでは、7,197Fに読まれるのは赤い <span class="mono">FF</span>（$1A:FF7F に書かれた値）ではありません。時計が減らすのは「読む場所」のアドレスのほうです。2フレームの間に、アドレスの上位バイトが FF から FD に下がるので、読む場所が $1A:FF7F から $1A:FD7F に変わります。$1A:FD7F はこのスクリプトの外で、そこに書かれている値は 8F です。その結果、命令は <span class="mono">00 FF</span> ではなく <span class="mono">00 8F</span> として実行されます。</p>
+    <p class="small">まぎらわしいのですが、ここには FF が2つ出てきます。アドレス $1A:<b>FF</b>7F の上位バイトの FF と、その場所に書かれている値の FF です。時計で変わるのは前者だけで、ROMに書かれた値は変わりません。FF が 8F に減るのではなく、読む場所がずれて、別の場所にあった 8F を読む、ということです。</p>
+    <figcaption>主人公が違うブロックでは <code>1E 0B</code> と <code>00 FF</code> が両方飛ばされ、次のブロックへ進みます。主人公が合うブロックでは、<code>1E 0B</code> を実行し、<code>00 FF</code> で終わります。ホークの場合、先頭から4番目のブロックの <code>00</code>（$1A:FF7E）まで、$1A:FF48 からの55バイトを同じフレームのうちに読みます（読む場所は54バイト進みます）。$1701 は音を鳴らす処理に渡す番号の置き場所です。変数0x40〜0x47が主人公を表していること（ホーク以外では未確認）と、<code>1E 0B</code> が曲を切り替える処理であることは、並びからの推定です。</figcaption>
+  </figure>
+  <details class="aside">
+    <summary>余談：スクリプト0x194は、なぜこんな書き方なのか</summary>
+    <div>
+      <p>同じ条件判定を2回書き、同じ形のブロックを8回並べる。ふつうのプログラムなら「主人公の番号で表を引いて曲番号を取り出す」と1行で済む処理です。こうなっているのは、スクリプトの命令の作りに理由があると考えられます。</p>
+      <ul class="plain">
+        <li><b>条件判定は「次の2バイトを飛ばす」しかできない</b>　飛ばす長さが2バイトに固定されていて、「ここからここまで」という範囲をまとめられません。条件つきで実行したい命令が2つ（<code>1E 0B</code> と <code>00 FF</code>）あるので、命令1つごとに同じ判定を付けています。</li>
+        <li><b>「違えば次へ」を書く方法がない</b>　そのため、先に曲番号を書いてしまい、主人公が違ったら次のブロックで上書きする、という順番になっています。</li>
+        <li><b>飛べるのは別のスクリプトの先頭だけ</b>　ジャンプ命令は、同じスクリプトの数バイト先へ飛ぶ使い方ができません。判定を繰り返すしかなくなります。</li>
+        <li><b>終了が2バイトの <code>00 FF</code> で書かれている</b>　終了だけなら1バイトの <code>1A</code> で足ります。飛ばす長さの2バイトに合わせるために、「終了しか書かれていないスクリプト0xFFへジャンプする」という回り道を使ったのでしょう。</li>
+      </ul>
+      <p>「次の1命令だけを飛ばす」という条件判定は、1960〜70年代の小型コンピューターや一部のマイコンにも見られる、ごく単純な作りです。判定の仕組みを単純にすると、スクリプトを解釈するプログラムは短く済みます。その代わりに、スクリプトを書く側が同じ判定を何度も書くことになります。</p>
+      <p>そして、この書き方がレイディバグの入口になっています。<code>1A</code> は1バイトなので、時計でずれる余地がありません。<code>00 FF</code> は2バイトの間に2フレームかかるので、12枚目のメモの上では、2バイト目として、512バイト手前の別の場所にある値が読まれます（補正がある場合は別）。</p>
+      <p class="muted">この欄の内容は、命令の並びと働きからの推測です。副命令の大半は未解読で、計算や自由な分岐の命令が別にある可能性は残っています。</p>
+    </div>
+  </details>
+  <figure class="fig">
+    <h3>ジャンプ命令の補足</h3>
+    <ul class="plain small">
+      <li><b>呼び出し（<code>1B</code>）との違い</b>　呼び出しはメモを1枚積み、呼んだスクリプトが終わると元の続きに戻ります。ジャンプ命令はメモを積まず、いまのメモの中身を書き換えるだけなので、元のスクリプトには戻りません。プログラムでいえば、呼び出しが関数呼び出し、ジャンプ命令がgotoにあたります。</li>
+      <li><b>本来の使われ方</b>　港に入ったときのイベントは <code>02 E8</code> で追い返しのスクリプト0x2E8に移ります。スクリプトの最後に <code>00 FF</code> と書いて、中身が「終了」だけのスクリプト0xFFに移って終わる、という使い方もあります。</li>
+    </ul>
+    <div class="scroll"><table>
+      <thead><tr><th>命令</th><th>スクリプト番号</th><th>スクリプトの一覧表（$1C:A620〜）に書かれた値</th><th>読み始めるアドレス</th><th>出てくる場面</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">00 FF</td><td class="mono">0x0FF</td><td class="mono">604E</td><td class="mono">$1A:E04E</td><td>スクリプト0x194の最後（本来の動き）</td></tr>
+        <tr><td class="mono">00 8F</td><td class="mono">0x08F</td><td class="mono">390A</td><td class="mono">$1A:B90A</td><td>バグで最初に起きるジャンプ（5章）</td></tr>
+        <tr><td class="mono">00 8B</td><td class="mono">0x08B</td><td class="mono">3819</td><td class="mono">$1A:B819</td><td>TASの1回目（7章）</td></tr>
+        <tr><td class="mono">00 A2</td><td class="mono">0x0A2</td><td class="mono">4098</td><td class="mono">$1A:C098</td><td>TASの2回目（7章）</td></tr>
+        <tr><td class="mono">02 A2</td><td class="mono">0x2A2</td><td class="mono">C669</td><td class="mono">$1B:C669</td><td>TASの3回目（7章）</td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>「スクリプトの一覧表」は、ROMの $1C:A620 から並んでいる、スクリプトごとの先頭アドレスの表です。1つのスクリプトにつき2バイトで、スクリプト番号nの値は $1C:A620＋n×2 にあります（例：スクリプト0x8Fなら $1C:A73E）。スクリプトの終わりは、次の番号の値で決まります。値が8000未満ならバンク$1Aで、アドレスは値に8000を足したもの。8000以上ならバンク$1Bで、アドレスは値そのままです。スクリプト番号が0x36A以上のものはバンク$1Cにあります。</figcaption>
+    <h3>一覧表の引き方</h3>
+    <p class="small">一覧表は、スクリプト0x000から0x3FFまでの1,024個ぶんの値が、番号順に2バイトずつ1列に並んだものです（$1C:A620〜$1C:AE1F）。命令の2バイトは別々の番号ではなく、1つのスクリプト番号の上の桁と下の桁です。1バイト目を「行」、2バイト目を「列」とする4行×256列の表と考えても、同じ結果になります。</p>
+    <div class="scroll"><table>
+      <thead><tr><th>1バイト目（行）</th><th>2バイト目（列）</th><th>スクリプト番号</th><th>スクリプトがあるバンク</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">00</td><td class="mono">00〜FF</td><td class="mono">0x000〜0x0FF</td><td class="mono">$1A</td></tr>
+        <tr><td class="mono">01</td><td class="mono">00〜98<br>99〜FF</td><td class="mono">0x100〜0x198<br>0x199〜0x1FF</td><td class="mono">$1A<br>$1B</td></tr>
+        <tr><td class="mono">02</td><td class="mono">00〜FF</td><td class="mono">0x200〜0x2FF</td><td class="mono">$1B</td></tr>
+        <tr><td class="mono">03</td><td class="mono">00〜69<br>6A〜FF</td><td class="mono">0x300〜0x369<br>0x36A〜0x3FF</td><td class="mono">$1B<br>$1C</td></tr>
+      </tbody>
+    </table></div>
+    <ul class="plain small">
+      <li><b>値の場所</b>　スクリプト番号nの値は $1C:A620＋n×2 にあります。<code>00 8F</code> なら n＝0x08F で、<wbr>$1C:A620＋0x11E＝$1C:A73E。そこに書かれた値は 390A です。</li>
+      <li><b>バンクの決め方</b>　一覧表の値は2バイトで、バンクは書かれていません。スクリプトは番号順に $1A → $1B → $1C と並んでいるので、番号と値から決めます。番号が0x36A以上なら $1C。それ未満なら、値が8000未満のとき $1A、8000以上のとき $1B です。境目の0x36Aという数は、一覧表の直前（$1C:A61E）に書かれています。</li>
+      <li><b>アドレスの作り方</b>　値の最上位ビットを立てたもの（8000未満なら8000を足したもの）が、バンク内のアドレスです。390A → $1A:B90A。</li>
+      <li><b>終了位置</b>　スクリプトは番号順に並んでいるので、次の番号の値（0x090の値 39CB → $1A:B9CB）が、そのままこのスクリプトの終わりになります。スクリプト0x08Fは $1A:B90A〜B9CA の193バイトです。</li>
+      <li><b>バグとの関係</b>　1バイト目（行）は、読み違えた先でたまたま命令として読まれた 00〜03 のどれかで決まります。2バイト目（列）としては、2フレームずれた先（512バイト手前。補正がある場合は別）のアドレスにある値が読まれます。ROMの値が書き換わるわけではなく、読む場所が変わります。押すタイミングで変わるのは、おもに「列」のほうです。</li>
+    </ul>
+  </figure>
 </section>
 
 <footer>アドレスは日本版ROMのもの、フレーム番号はTAS入力ファイル（7,279F版）の行番号です。イベント処理が読んだバイトを1つずつ記録する方法と、プログラムの逆アセンブルで確かめました。</footer>
