@@ -34,6 +34,9 @@
 --       [CMD 12]  ボタン待ちの命令 12 の待ち。12枚目のメモで待っているときは、押すフレームで次に読む場所が変わる（橙）
 --       [END]     スクリプトが終わり、文章の窓を閉じる前の待ち。押すとその段が終わって外側の段に戻るので、
 --                 押すフレームでは行き先が変わらない。12枚目のメモの読み取り位置が終了位置に重なったときにも起きる
+--     INPUT: MAP     世界地図の行き先選び（$00:E612〜）。A＝決定、B＝キャンセル、↑・X／↓・Y＝カーソル。
+--                    命令 12 の待ちとは別の処理で、押しっぱなしのボタンを見ている。決定してもその場所へは移らず、
+--                    地図が閉じてスクリプトの続きを読む
 --     INPUT: HOLD    押しっぱなしのボタンを見ている（フィールドの歩行など。SHOW_HOLD = true のときだけ）
 --   エンディングに入ったら、入口（40 6F か 40 70）、命令 40 から入ったか命令を読まずに飛んできたか、
 --   その直前に読んだ命令の位置を記録に書き、画面に ENDING と出す。
@@ -518,6 +521,17 @@ local function press_wait_kind()
   end
   return nil
 end
+-- 世界地図の行き先選び（$00:E612 を $00:93F6 から呼んだ戻り先 $93F8 がスタックにある）
+local function in_map_wait()
+  local sp = reg("S")
+  if sp == nil then return false end
+  sp = sp % 0x10000
+  if sp >= 0x1FA0 then return false end
+  for i = 1, 0x60 do
+    if memory.read_u8(sp + i, "WRAM") == 0xF8 and memory.read_u8(sp + i + 1, "WRAM") == 0x93 then return true end
+  end
+  return false
+end
 local function in_choice_wait()
   local sp = reg("S")
   if sp == nil then return false end
@@ -564,7 +578,9 @@ local function draw_choice()
   local dh = now - input_held_frame
   local new_on = dn >= 0 and dn <= 3    -- ステート読み込みや巻き戻しで前後した分は数えない
   local held_on = dh >= 0 and dh <= 3
-  if new_on and in_choice_wait() then
+  if (new_on or held_on) and in_map_wait() then
+    gui.text(4, 124, "INPUT: MAP (A decide / B cancel / UP,X DOWN,Y cursor)", "cyan")
+  elseif new_on and in_choice_wait() then
     gui.text(4, 124, "INPUT: CHOICE (A / B / LEFT / RIGHT)", "cyan")
   elseif new_on then
     local kind = press_wait_kind()
