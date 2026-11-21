@@ -278,7 +278,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   </figure>
   <figure class="fig">
     <h3>待ち続けたときに読む場所（押すフレームごと）</h3>
-    <p class="small">フレームは、バグの発火（12枚目のメモが書き換わるフレーム）を0として数えています。TASの前半が縮んでも、発火からのフレーム数で見れば同じ関係が成り立ちます。かっこ内は、いまのTASでのフレーム番号です。</p>
+    <p class="small">フレームは、バグの発火（12枚目のメモが書き換わるフレーム）を0として数えています。TASの前半が縮んでも、発火した時点のゲームの状態が同じなら、発火からのフレーム数で見れば同じ関係が成り立ちます（前半の違いで変わるのは音楽の再生位置くらいと見られますが、レイディバグ中は音の処理を呼ぶ場面もあるので、念のため確かめる必要があります）。かっこ内は、いまのTASでのフレーム番号です。</p>
     <div class="readout">
       <div><small>押すフレーム（発火から）</small><b id="sF">5</b><small id="sFt" style="display:block;margin-top:2px">（TASでは7,200F）</small></div>
       <div><small>プレイ時間カウンタ</small><b id="sC" style="color:var(--count)">0x1AB6</b></div>
@@ -546,17 +546,17 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     <h3>方法①の実例：TAS以外の入口</h3>
     <p class="small">TASが使う $1B:B476 以外の入口にも、実際に届く押し方を確かめました（<code>40 70</code> が4か所、エピローグから始まる <code>40 6F</code> が1か所）。どれもボタン待ちの間にAを押すだけで、Xは使いません。最後の入力がTAS（7,278F）より遅いので、短縮にはなりません。<br>押し方は、押すフレームではなく「どのボタン待ちで待っていて、押したときに12枚目のメモがどこを指しているか」で書いています。読み始める場所は、待っている場所の上位バイトを待ったフレーム数だけ減らし（ノコギリの形で1つ上のバンクへ移ることがあります）、下位バイトを1つ進めた場所です。同じ場所で待っていて同じ読み始めの場所を狙えば、何フレーム目にそこへ着いたかに関係なく、読む場所は同じになります（ほかの状態が違えば、そのあとの動きが変わることはあります）。いまのTASの経路（$1B:B476）にだけ、押すフレームを添えています。</p>
     <div class="scroll"><table>
-      <thead><tr><th>入口</th><th>押し方（ボタン待ちの場所 → 押したときに読み始める場所）</th><th>押す回数</th><th>最後の入力</th></tr></thead>
+      <thead><tr><th>入口</th><th>押し方（ボタン待ちの場所 → 押したときに読み始める場所）</th><th>押す回数</th><th>最後の入力（発火から）</th></tr></thead>
       <tbody>
-      <tr><td><span class="mono">$1B:B0B3</span><br><span class="muted small">40 70</span></td><td class="mono small">$1A:B917→$1A:AD18<br>$1A:AD27→$1A:A528<br>$1A:A158→$1A:9C59<br>$1A:90B1→$1B:B0B2</td><td class="n">4</td><td class="n">7,328F</td></tr>
-      <tr><td><span class="mono">$1B:B280</span><br><span class="muted small">40 70</span></td><td class="mono small">$1A:B917→$1A:B118<br>$1A:AD27→$1A:A528<br>$1A:A158→$1A:8A59<br>$1A:8470→$1A:8071<br>$1A:807E→$1B:B27F</td><td class="n">5</td><td class="n">7,332F</td></tr>
-      <tr><td><span class="mono">$1B:AE33</span><br><span class="muted small">40 70</span></td><td class="mono small">$1A:B917→$1A:B118<br>$1A:AD27→$1A:8328<br>$1A:8332→$1B:AE33</td><td class="n">3</td><td class="n">7,336F</td></tr>
-      <tr><td><span class="mono">$1B:B1BE</span><br><span class="muted small">40 70</span></td><td class="mono small">$1A:B917→$1A:B118<br>$1A:AD27→$1A:A628<br>$1A:A62E→$1A:9C2F<br>$1A:9A3C→$1A:953D<br>$1A:953F→$1A:8C40<br>$1A:8C4A→$1A:874B<br>$1A:8565→$1A:8166<br>$1A:8171→$1B:F372<br>$1A:8764→$1B:FF65<br>$1B:F77C→$1B:F47D<br>$1B:C5A5→$1B:C2A6<br>$1B:C0B8→$1B:B7B9</td><td class="n">12</td><td class="n">7,353F</td></tr>
-      <tr><td><span class="mono">$1A:BB57</span><br><span class="muted small">40 6F</span></td><td class="mono small">$1A:B917→$1A:A818<br>$1A:A81D→$1A:951E<br>$1A:8565→$1B:FD66<br>$1B:FB6F→$1B:F870<br>$1B:F77C→$1B:F67D<br>$1B:F698→$1B:F399<br>$1B:F39E→$1B:F19F<br>$1A:CB56→$1A:BB57</td><td class="n">8</td><td class="n">7,290F</td></tr>
-      <tr><td><span class="mono">$1B:B476</span><br><span class="muted small">40 70・TAS</span></td><td class="mono small">$1A:B917→$1A:A718 <span class="muted">7,215F</span><br>$1A:A71C→$1A:A41D <span class="muted">7,218F</span><br>$1A:A428→$1A:A129 <span class="muted">7,221F</span><br>$1A:B825→$1A:B426 <span class="muted">7,227F</span><br>$1A:B430→$1A:AC31 <span class="muted">7,235F</span><br><span class="muted">（文章の途中で X → $1A:B6AD）　7,244F</span><br><span class="muted">（文章の途中で X → $1A:ABB4）　7,255F</span><br>$1B:C275→$1B:B476 <span class="muted">7,278F</span></td><td class="n">8</td><td class="n">7,278F</td></tr>
+      <tr><td><span class="mono">$1B:B0B3</span><br><span class="muted small">40 70</span></td><td class="mono small">$1A:B917→$1A:AD18<br>$1A:AD27→$1A:A528<br>$1A:A158→$1A:9C59<br>$1A:90B1→$1B:B0B2</td><td class="n">4</td><td class="n">133<br><span class="muted small">TASでは7,328F</span></td></tr>
+      <tr><td><span class="mono">$1B:B280</span><br><span class="muted small">40 70</span></td><td class="mono small">$1A:B917→$1A:B118<br>$1A:AD27→$1A:A528<br>$1A:A158→$1A:8A59<br>$1A:8470→$1A:8071<br>$1A:807E→$1B:B27F</td><td class="n">5</td><td class="n">137<br><span class="muted small">TASでは7,332F</span></td></tr>
+      <tr><td><span class="mono">$1B:AE33</span><br><span class="muted small">40 70</span></td><td class="mono small">$1A:B917→$1A:B118<br>$1A:AD27→$1A:8328<br>$1A:8332→$1B:AE33</td><td class="n">3</td><td class="n">141<br><span class="muted small">TASでは7,336F</span></td></tr>
+      <tr><td><span class="mono">$1B:B1BE</span><br><span class="muted small">40 70</span></td><td class="mono small">$1A:B917→$1A:B118<br>$1A:AD27→$1A:A628<br>$1A:A62E→$1A:9C2F<br>$1A:9A3C→$1A:953D<br>$1A:953F→$1A:8C40<br>$1A:8C4A→$1A:874B<br>$1A:8565→$1A:8166<br>$1A:8171→$1B:F372<br>$1A:8764→$1B:FF65<br>$1B:F77C→$1B:F47D<br>$1B:C5A5→$1B:C2A6<br>$1B:C0B8→$1B:B7B9</td><td class="n">12</td><td class="n">158<br><span class="muted small">TASでは7,353F</span></td></tr>
+      <tr><td><span class="mono">$1A:BB57</span><br><span class="muted small">40 6F</span></td><td class="mono small">$1A:B917→$1A:A818<br>$1A:A81D→$1A:951E<br>$1A:8565→$1B:FD66<br>$1B:FB6F→$1B:F870<br>$1B:F77C→$1B:F67D<br>$1B:F698→$1B:F399<br>$1B:F39E→$1B:F19F<br>$1A:CB56→$1A:BB57</td><td class="n">8</td><td class="n">95<br><span class="muted small">TASでは7,290F</span></td></tr>
+      <tr><td><span class="mono">$1B:B476</span><br><span class="muted small">40 70・TAS</span></td><td class="mono small">$1A:B917→$1A:A718 <span class="muted">7,215F</span><br>$1A:A71C→$1A:A41D <span class="muted">7,218F</span><br>$1A:A428→$1A:A129 <span class="muted">7,221F</span><br>$1A:B825→$1A:B426 <span class="muted">7,227F</span><br>$1A:B430→$1A:AC31 <span class="muted">7,235F</span><br><span class="muted">（文章の途中で X → $1A:B6AD）　7,244F</span><br><span class="muted">（文章の途中で X → $1A:ABB4）　7,255F</span><br>$1B:C275→$1B:B476 <span class="muted">7,278F</span></td><td class="n">8</td><td class="n">83<br><span class="muted small">TASでは7,278F</span></td></tr>
       </tbody>
     </table></div>
-    <figcaption>フレームは入力ファイルの行の番号（0始まり）です。<code>40 70</code> の経路は、どれも最後のAを押したフレーム、または数フレーム後にエンディングの処理（<span class="mono">$03:8D63</span>）へ入ることを、最初から通しで実行して確かめました。<code>40 6F</code> の経路（$1A:BB57）は、7,290Fに <code>40</code> を読んでエピローグから始まり、エンディングの処理に入るのは8,006Fです。この経路は、別のチャットで行った探索の結果を、こちらで通しで実行して確かめたものです。押し方の欄で「文章の途中で X」とあるのは、ボタン待ちではなく、文字を書いている途中で押すもの（TASの7,244F・7,255F）です。$1B:AE33 へ入る経路は押下が3回で、見つかっている中で最も少ない操作です。$1B:B1BE の経路は、ランダムに押した試行でたまたま見つかったものを、必要な押下だけに絞りました。なお、命令 <code>40</code> は次のバイトの最上位ビットを無視するので、<code>40 F0</code> は <code>40 70</code>、<code>40 EF</code> は <code>40 6F</code> と同じ処理が選ばれます（番号を2倍した下位8ビットが、どちらも同じになるためです。そのあとの状態まで同じになるとは限りません）。バンク$19〜$1Bにある <code>40 F0</code>・<code>40 EF</code> は <span class="mono">$19:942D</span> の1か所だけです。</figcaption>
+    <figcaption>「最後の入力」は、発火（12枚目のメモが書き換わるフレーム、TASでは7,195F）を0として数えたフレームです。TASの行に添えたフレームと「TASでは」の値は、入力ファイルの行の番号（0始まり）です。<code>40 70</code> の経路は、どれも最後のAを押したフレーム、または数フレーム後にエンディングの処理（<span class="mono">$03:8D63</span>）へ入ることを、最初から通しで実行して確かめました。<code>40 6F</code> の経路（$1A:BB57）は、7,290Fに <code>40</code> を読んでエピローグから始まり、エンディングの処理に入るのは8,006Fです。この経路は、別のチャットで行った探索の結果を、こちらで通しで実行して確かめたものです。押し方の欄で「文章の途中で X」とあるのは、ボタン待ちではなく、文字を書いている途中で押すもの（TASの7,244F・7,255F）です。$1B:AE33 へ入る経路は押下が3回で、見つかっている中で最も少ない操作です。$1B:B1BE の経路は、ランダムに押した試行でたまたま見つかったものを、必要な押下だけに絞りました。なお、命令 <code>40</code> は次のバイトの最上位ビットを無視するので、<code>40 F0</code> は <code>40 70</code>、<code>40 EF</code> は <code>40 6F</code> と同じ処理が選ばれます（番号を2倍した下位8ビットが、どちらも同じになるためです。そのあとの状態まで同じになるとは限りません）。バンク$19〜$1Bにある <code>40 F0</code>・<code>40 EF</code> は <span class="mono">$19:942D</span> の1か所だけです。</figcaption>
   </figure>
   <figure class="fig">
     <h3>方法②：処理スクリプトの命令から直接呼ぶ（未確認）</h3>
@@ -723,19 +723,19 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     </tbody>
   </table></div>
   <div class="scroll"><table>
-    <thead><tr><th></th><th>Aを押すフレーム</th><th>暴走が始まるフレーム</th></tr></thead>
+    <thead><tr><th></th><th>Aを押すフレーム（発火から）</th><th>暴走が始まるフレーム（発火から）</th></tr></thead>
     <tbody>
-      <tr><td>見つかっている中で最も早い</td><td class="mono">7209・7224・7244・7253・7256</td><td class="n">7,256F</td></tr>
-      <tr><td>2回の押下で最も早い</td><td class="mono">7230・7271</td><td class="n">約7,279F</td></tr>
-      <tr><td>最も少ない操作</td><td class="mono">7713（1回）</td><td class="n">約7,714F</td></tr>
+      <tr><td>見つかっている中で最も早い</td><td class="mono">14・29・49・58・61</td><td class="n">61<br><span class="muted small">TASでは7,256F</span></td></tr>
+      <tr><td>2回の押下で最も早い</td><td class="mono">35・76</td><td class="n">約84<br><span class="muted small">TASでは約7,279F</span></td></tr>
+      <tr><td>最も少ない操作</td><td class="mono">518（1回）</td><td class="n">約519<br><span class="muted small">TASでは約7,714F</span></td></tr>
     </tbody>
   </table></div>
-  <p class="small muted">「暴走」は、フレームの切れ目の実行位置がRAMにある状態が続くことです。7,253Fまでの押下では、7,254F時点で暴走している状態は1つもありませんでした（下の条件で探索した約62万通りの状態すべて）。それより後に押した場合は、ボタン待ちの下位バイトごとに代表を1つずつ選んで試しただけなので、見つかっている最速は7,256Fですが、それより早い暴走がないとは言い切れません。<br>探索の条件：TASの入力の0〜7,197行目を再生した状態から始め、12枚目のメモでボタン待ち（命令 <code>12</code>）に着いたときだけ、12個のボタンのどれか1つを1フレームだけ押す（同時押しはなし、待つフレーム数はすべて試す）。エミュレーターの保存データ全体が同じなら同じ状態とみなす（実行ごとに変わるホスト側のポインタは除く）。文章の途中での押下は含まない。BizHawk 2.11.1 のコアを直接動かす自作プログラムで行い、別の方法で行った探索の結果（7,243Fまで）とは全状態で一致しました。ランダムに押した600回の試行では、暴走は5回（1%）、命令を読まなくなって止まるのが303回、2,500フレーム後も進んでいたのが291回、エンディングが1回でした（合計600回。最初に暴走と判定した6回のうち1回は、下の「スタックの上で実行する処理」を取り違えたものだったので、「進んでいた」に数え直しています）。</p>
+  <p class="small muted">「暴走」は、フレームの切れ目の実行位置がRAMにある状態が続くことです。発火から58フレーム（TASでは7,253F）までの押下では、59フレームの時点で暴走している状態は1つもありませんでした（下の条件で探索した約62万通りの状態すべて）。それより後に押した場合は、ボタン待ちの下位バイトごとに代表を1つずつ選んで試しただけなので、見つかっている最速は発火から61フレームですが、それより早い暴走がないとは言い切れません。<br>探索の条件：TASの入力の0〜7,197行目を再生した状態から始め、12枚目のメモでボタン待ち（命令 <code>12</code>）に着いたときだけ、12個のボタンのどれか1つを1フレームだけ押す（同時押しはなし、待つフレーム数はすべて試す）。エミュレーターの保存データ全体が同じなら同じ状態とみなす（実行ごとに変わるホスト側のポインタは除く）。文章の途中での押下は含まない。BizHawk 2.11.1 のコアを直接動かす自作プログラムで行い、別の方法で行った探索の結果（7,243Fまで）とは全状態で一致しました。ランダムに押した600回の試行では、暴走は5回（1%）、命令を読まなくなって止まるのが303回、2,500フレーム後も進んでいたのが291回、エンディングが1回でした（合計600回。最初に暴走と判定した6回のうち1回は、下の「スタックの上で実行する処理」を取り違えたものだったので、「進んでいた」に数え直しています）。</p>
   <p class="small muted">バンク$02には、RAMを一定の値で埋める処理（<span class="mono">$02:C7EC</span>〜）があり、ブロック転送の命令と戻りの命令の4バイトをスタックの上に書いて、そこを実行します。正常な動作ですが、埋める長さがでたらめに大きいと数フレームかかり、その間は実行位置がRAMにあるように見えます。オブジェクトの削除が終わらない型も、このあと処理が続いた先で起きていました。</p>
 
   <h3>ボタンによる違いと、暗転の裏で開く地図</h3>
   <p>ボタン待ちで押すボタンを変えても、次に止まる場所とフレームは変わりませんでした（1,050通りで比較）。違いは「どのボタンを押したか」を覚えている数バイトだけで、メモの領域は1バイトも変わりません。Bを押したときだけ <span class="mono">$16BE</span> に印が付きます。同じボタンを続けて2フレーム押すと、2回目は無視されます。</p>
-  <p>例外は、処理スクリプトが別の画面を開いている場面です。バグ発生後、7,200FにAを1回押すと、暗転の裏でマルディアスの地図（行き先選び）が開きます。ここでは ↑・X と ↓・Y がカーソルの移動、Aが決定、Bがキャンセルで、L・R・←・→ には反応しません。決定すると地図が閉じ、12枚目のメモからスクリプトの続きが読まれます。調べた例では、その中でマップ移動の命令 <code>05</code>（<span class="mono">$1B:D03E</span>）を読み違えて別のマップへ移りました。ただし移り先はこの命令の引数で決まり、パイレーツコーストとサンゴ海のどちらを選んでも同じ場所でした。そのあと読まれる命令も同じで、変わるのは選んだ番号を覚える1バイト（<span class="mono">$1236</span>）だけです。</p>
+  <p>例外は、処理スクリプトが別の画面を開いている場面です。最初のボタン待ちで、発火から5フレーム目（TASでは7,200F）にAを1回押すと（12枚目のメモが $1A:B618 を指すとき）、暗転の裏でマルディアスの地図（行き先選び）が開きます。ここでは ↑・X と ↓・Y がカーソルの移動、Aが決定、Bがキャンセルで、L・R・←・→ には反応しません。決定すると地図が閉じ、12枚目のメモからスクリプトの続きが読まれます。調べた例では、その中でマップ移動の命令 <code>05</code>（<span class="mono">$1B:D03E</span>）を読み違えて別のマップへ移りました。ただし移り先はこの命令の引数で決まり、パイレーツコーストとサンゴ海のどちらを選んでも同じ場所でした。そのあと読まれる命令も同じで、変わるのは選んだ番号を覚える1バイト（<span class="mono">$1236</span>）だけです。</p>
 </section>
 
 <section>
