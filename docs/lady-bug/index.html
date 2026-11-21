@@ -508,7 +508,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   <div class="eyebrow">7 ／ 応用</div>
   <h2>TASは、本物のエンディングスクリプトの最後の2バイトを読ませている</h2>
   <p>7,279F版は8回の押下と3回のジャンプで、エンディング演出のスクリプト（番号0x277）の最後にある <code>40 70</code>（エンディング開始）へ、ちょうど読む場所を合わせています。</p>
-  <p>エンディングの始め方は、仕組みの上で2通り考えられます。<b>① スクリプトの命令 <code>40 70</code>（または <code>40 6F</code>）を読ませる方法</b>と、<b>② スクリプトを経由せず、エンディングの処理を直接呼ばせる方法</b>です。実際に成功しているのは①だけで、この章の大部分は①の説明です。②は入口になりうる仕組みを確かめた段階で、章の最後にまとめます。</p>
+  <p>エンディングの始め方は、仕組みの上で2通り考えられます。<b>① スクリプトの命令 <code>40 70</code> か <code>40 6F</code> を読ませる方法</b>と、<b>② スクリプトを経由せず、エンディングの処理を直接呼ばせる方法</b>です。実際に成功しているのは①だけで、この章の大部分は①の説明です。②は入口になりうる仕組みを確かめた段階で、章の最後にまとめます。</p>
   <figure class="fig">
     <div class="scroll"><svg id="tas" viewBox="0 0 720 330" width="720" role="img" aria-label="TASの経路。フレームごとの読む場所の推移"></svg></div>
     <div class="legend"><span style="--c:var(--accent)">バンク$1Aを読んでいる</span><span style="--c:var(--bank2)">バンク$1Bを読んでいる</span><span style="--c:var(--hot)">エンディング命令の場所</span></div>
@@ -516,46 +516,44 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   </figure>
   <figure class="fig">
     <h3>方法①：エンディングを呼ぶ条件</h3>
-    <p class="small">エンディング開始の命令 <code>40 70</code> がある場所に、読む場所を合わせれば始まります。読む場所は直接指定できないので、「決まった下位バイトのボタン待ちに止まる」ことが本質的な条件です。止まれさえすれば、あとは待つフレーム数で合わせられます。</p>
+    <p class="small">エンディングを始める副命令は2つあり、どちらを読ませても入力なしでエンディングの最後まで進みます。</p>
     <div class="scroll"><table>
-      <thead><tr><th>条件</th><th>$1B:B476 を狙う場合</th><th>TASでの満たし方</th></tr></thead>
+      <thead><tr><th>副命令</th><th>飛び先</th><th>始まる場面</th></tr></thead>
       <tbody>
-        <tr><td>1. 下位バイト<br><span class="muted small">（これが難関）</span></td><td>下位バイトが75の位置にあるボタン待ちで止まる（押すと次の76から読む）</td><td>3回ジャンプして、<wbr>$1B:C275 のボタン待ちに止まる</td></tr>
-        <tr><td>2. 押すフレーム</td><td>読む場所が $1B:B4xx になるフレームで押す。バンク$1Bで上位がB4より大きければ、B4まで減るのを待つ。そうでなくても、待ち続ければバンクを行きつ戻りつするので、カウンタが0x1A34になるときに同じ場所を通る</td><td>C2からB4まで減るのを14フレーム待ってAを押す</td></tr>
-        
+        <tr><td><code>40 70</code></td><td class="mono">$03:800F</td><td>風景とスタッフロール</td></tr>
+        <tr><td><code>40 6F</code></td><td class="mono">$03:800C</td><td>城と港の会話（エピローグ）。無入力のまま約6,100フレーム後に、<code>40 70</code> と同じスタッフロールへ着く</td></tr>
       </tbody>
     </table></div>
-    <figcaption><code>40 70</code> というバイト列はスクリプトの領域に8か所あります（$1A:E3F8、<wbr>$1B:AE33、AF88、B0B3、B1BE、B280、B3C2、B476）。どれに合わせても同じ命令が実行されます。命令 <code>40</code> は次のバイトの最上位ビットを無視するので、<code>40 F0</code> は <code>40 70</code>、<code>40 EF</code> は <code>40 6F</code> と同じ処理が選ばれます（番号を2倍した下位8ビットが、どちらも同じになるためです。そのあとの状態まで同じになるとは限りません）。バンク$19〜$1Bにある <code>40 F0</code>・<code>40 EF</code> は <span class="mono">$19:942D</span> の1か所だけです。少し手前に入っても、間の命令を読み進んで <code>40 70</code> に届く場合がありますが、途中でフレームを使う命令があると読む場所がまたずれるので、場所ごとに確かめる必要があります。</figcaption>
-    <h3>止まればよいボタン待ちの候補</h3>
-    <p class="small">スクリプトのある3つのバンクで、必要な下位バイトの位置に <code>12</code>（ボタン待ち）がある場所を数えました。B476を狙う場合の候補は5か所です（$1A:8775、<wbr>$1A:CF75、<wbr>$1B:8175、<wbr>$1B:8C75、<wbr>$1B:C275）。TASが使ったのは最後の1つです。</p>
+    <p class="small">ムービーの長さは最後の入力で決まるので、どちらの入口も同じ条件で比べられます。この並びがある場所に読む場所を合わせれば、エンディングが始まります。読む場所は直接指定できないので、「決まった下位バイトのボタン待ちに止まる」ことが本質的な条件です。止まれさえすれば、あとは待つフレーム数で合わせられます。</p>
     <div class="scroll"><table>
-      <thead><tr><th>狙う <code>40 70</code> の場所</th><th>必要な下位バイト</th><th>候補（$1A）</th><th>候補（$1B）</th><th>候補（$1C）</th></tr></thead>
+      <thead><tr><th>条件</th><th>内容</th><th>例：TASの $1B:B476（<code>40 70</code>）</th></tr></thead>
       <tbody>
-        <tr><td class="mono">$1B:AE33</td><td class="mono">32</td><td class="n">4</td><td class="n">2</td><td class="n">1</td></tr>
-        <tr><td class="mono">$1B:AF88</td><td class="mono">87</td><td class="n">4</td><td class="n">0</td><td class="n">3</td></tr>
-        <tr><td class="mono">$1B:B0B3</td><td class="mono">B2</td><td class="n">2</td><td class="n">0</td><td class="n">0</td></tr>
-        <tr><td class="mono">$1B:B1BE</td><td class="mono">BD</td><td class="n">5</td><td class="n">1</td><td class="n">0</td></tr>
-        <tr><td class="mono">$1B:B280</td><td class="mono">7F</td><td class="n">2</td><td class="n">5</td><td class="n">1</td></tr>
-        <tr><td class="mono">$1B:B3C2</td><td class="mono">C1</td><td class="n">1</td><td class="n">0</td><td class="n">0</td></tr>
-        <tr><td class="mono">$1B:B476</td><td class="mono">75</td><td class="n">2</td><td class="n">3</td><td class="n">0</td></tr>
-        <tr><td class="mono">$1A:E3F8</td><td class="mono">F7</td><td class="n">3</td><td class="n">1</td><td class="n">0</td></tr>
+        <tr><td>1. 下位バイト<br><span class="muted small">（これが難関）</span></td><td><code>40</code> の位置の下位バイトより1小さい位置にあるボタン待ちで止まる（押すと次の位置から読む）</td><td>3回ジャンプして、下位バイトが75の <wbr>$1B:C275 のボタン待ちに止まる</td></tr>
+        <tr><td>2. 押すフレーム</td><td>読む場所の上位バイトが <code>40</code> の位置と同じになるフレームで押す。同じバンクで上位が大きければ、減るのを待つ。そうでなくても、待ち続ければバンクを行きつ戻りつするので、いずれ同じ場所を通る</td><td>C2からB4まで減るのを14フレーム待ってAを押す</td></tr>
       </tbody>
     </table></div>
-    <figcaption>合計で40か所です。ただし、値が <code>12</code> でも別の命令の引数やスクリプトでないデータの場合があり、そこに命令の先頭として行き着く道筋があるかも場所ごとに探す必要があります。実際に試したのは $1B:C275 から $1B:B476 へ入る経路だけで、「待ち続ければ同じ場所を通る」という点も仕組みからの計算です。</figcaption>
-    <h3>もう1つの入口：<code>40 6F</code></h3>
-    <p class="small">エンディングを始める副命令は <code>40 70</code> のほかに <code>40 6F</code> があります。<code>40 6F</code> は $03:800C へ飛び、城と港の会話（エピローグ）から始まります。エピローグは無入力のまま進み、約6,100フレーム後に <code>40 70</code> と同じスタッフロールへ着きます。最後の入力でムービーを終える数え方なら、<code>40 6F</code> を読ませたフレームで比べればよく、これも候補になります。</p>
+    <h3>狙える場所と、止まればよいボタン待ちの候補</h3>
+    <p class="small">スクリプトの領域にある <code>40 70</code>・<code>40 6F</code> の並びと、それぞれについて、必要な下位バイトの位置に <code>12</code>（ボタン待ち）がある場所の数です。たとえば $1B:B476 を狙う場合の候補は5か所です（$1A:8775、<wbr>$1A:CF75、<wbr>$1B:8175、<wbr>$1B:8C75、<wbr>$1B:C275）。TASが使ったのは最後の1つです。</p>
     <div class="scroll"><table>
-      <thead><tr><th>狙う <code>40 6F</code> の場所</th><th>必要な下位バイト</th><th>候補（$1A）</th><th>候補（$1B）</th><th>候補（$1C）</th></tr></thead>
+      <thead><tr><th>狙う場所</th><th>並び</th><th>必要な下位バイト</th><th>候補（$1A）</th><th>候補（$1B）</th><th>候補（$1C）</th></tr></thead>
       <tbody>
-        <tr><td><span class="mono">$1A:BB57</span><br><span class="muted small">本物のスクリプト</span></td><td class="mono">56</td><td class="n">4</td><td class="n">1</td><td class="n">1</td></tr>
-        <tr><td><span class="mono">$1D:CE4D</span><br><span class="muted small">データの中の偶然の並び</span></td><td class="mono">4C</td><td class="n">2</td><td class="n">1</td><td class="n">1</td></tr>
+        <tr><td class="mono">$1A:BB57</td><td><code>40 6F</code></td><td class="mono">56</td><td class="n">4</td><td class="n">1</td><td class="n">1</td></tr>
+        <tr><td class="mono">$1A:E3F8</td><td><code>40 70</code></td><td class="mono">F7</td><td class="n">3</td><td class="n">1</td><td class="n">0</td></tr>
+        <tr><td class="mono">$1B:AE33</td><td><code>40 70</code></td><td class="mono">32</td><td class="n">4</td><td class="n">2</td><td class="n">1</td></tr>
+        <tr><td class="mono">$1B:AF88</td><td><code>40 70</code></td><td class="mono">87</td><td class="n">4</td><td class="n">0</td><td class="n">3</td></tr>
+        <tr><td class="mono">$1B:B0B3</td><td><code>40 70</code></td><td class="mono">B2</td><td class="n">2</td><td class="n">0</td><td class="n">0</td></tr>
+        <tr><td class="mono">$1B:B1BE</td><td><code>40 70</code></td><td class="mono">BD</td><td class="n">5</td><td class="n">1</td><td class="n">0</td></tr>
+        <tr><td class="mono">$1B:B280</td><td><code>40 70</code></td><td class="mono">7F</td><td class="n">2</td><td class="n">5</td><td class="n">1</td></tr>
+        <tr><td class="mono">$1B:B3C2</td><td><code>40 70</code></td><td class="mono">C1</td><td class="n">1</td><td class="n">0</td><td class="n">0</td></tr>
+        <tr><td class="mono">$1B:B476</td><td><code>40 70</code><br><span class="muted small">TAS</span></td><td class="mono">75</td><td class="n">2</td><td class="n">3</td><td class="n">0</td></tr>
+        <tr><td class="mono">$1D:CE4D</td><td><code>40 6F</code><br><span class="muted small">データの中の偶然の並び</span></td><td class="mono">4C</td><td class="n">2</td><td class="n">1</td><td class="n">1</td></tr>
       </tbody>
     </table></div>
-    <figcaption>候補は上の表と同じ数え方で、<wbr>$1A:BB57 狙いは $1A:A056、<wbr>$1A:CB56、<wbr>$1A:F256、<wbr>$1A:F656、<wbr>$1B:D356、<wbr>$1C:B256、<wbr>$1D:CE4D 狙いは $1A:9A4C、<wbr>$1A:C04C、<wbr>$1B:834C、<wbr>$1C:C34C です。発火直後の状態で $1A:BB57 を読ませると、その場でエピローグに入ることを確かめました。この場所を時間内に読ませる道筋があるかは、まだ確かめていません。$1D:CE4D はバンク$1Dを実測していないため、まだ調べていません。</figcaption>
+    <figcaption>$1A:BB57 は本物のスクリプトの中にある <code>40 6F</code>（直前は暗転とウィンドウを閉じる命令）、$1B:B476 は本物のエンディング演出のスクリプト（0x277）の最後にある <code>40 70</code> です。同じ並びなら、どの場所に合わせても同じ処理が選ばれます。命令 <code>40</code> は次のバイトの最上位ビットを無視するので、<code>40 F0</code> は <code>40 70</code>、<code>40 EF</code> は <code>40 6F</code> と同じ処理が選ばれます（番号を2倍した下位8ビットが、どちらも同じになるためです。そのあとの状態まで同じになるとは限りません）。バンク$19〜$1Bにある <code>40 F0</code>・<code>40 EF</code> は <span class="mono">$19:942D</span> の1か所だけです。<br>候補の場所は、<wbr>$1A:BB57 狙いが $1A:A056、<wbr>$1A:CB56、<wbr>$1A:F256、<wbr>$1A:F656、<wbr>$1B:D356、<wbr>$1C:B256、<wbr>$1D:CE4D 狙いが $1A:9A4C、<wbr>$1A:C04C、<wbr>$1B:834C、<wbr>$1C:C34C です。値が <code>12</code> でも別の命令の引数やスクリプトでないデータの場合があり、そこに命令の先頭として行き着く道筋があるかは場所ごとに探す必要があります。少し手前に入っても、間の命令を読み進んで <code>40</code> に届く場合がありますが、途中でフレームを使う命令があると読む場所がまたずれます。$1D:CE4D はバンク$1Dを実測していないため、まだ調べていません。</figcaption>
   </figure>
   <figure class="fig">
-    <h3>方法①の実例：TAS以外の入口</h3>
-    <p class="small">TASが使う $1B:B476 以外の入口にも、実際に届く押し方を確かめました（<code>40 70</code> が4か所、エピローグから始まる <code>40 6F</code> が1か所）。どれもボタン待ちの間にAを押すだけで、Xは使いません。最後の入力がTAS（7,278F）より遅いので、短縮にはなりません。<br>押し方は、押すフレームではなく「どのボタン待ちで待っていて、押したときに12枚目のメモがどこを指しているか」で書いています。読み始める場所は、待っている場所の上位バイトを待ったフレーム数だけ減らし（ノコギリの形で1つ上のバンクへ移ることがあります）、下位バイトを1つ進めた場所です。同じ場所で待っていて同じ読み始めの場所を狙えば、何フレーム目にそこへ着いたかに関係なく、読む場所は同じになります（ほかの状態が違えば、そのあとの動きが変わることはあります）。いまのTASの経路（$1B:B476）にだけ、押すフレームを添えています。</p>
+    <h3>方法①の実例：実際に届いた入口</h3>
+    <p class="small">TASが使う $1B:B476 のほかに、5か所の入口で実際に届く押し方を確かめました（<code>40 70</code> が4か所、<code>40 6F</code> が1か所）。どれもボタン待ちの間にAを押すだけで、Xは使いません。最後の入力はどれもTAS（7,278F）より遅く、最も近いのは <code>40 6F</code> の $1A:BB57（7,290F、12フレーム差）です。<br>押し方は、押すフレームではなく「どのボタン待ちで待っていて、押したときに12枚目のメモがどこを指しているか」で書いています。読み始める場所は、待っている場所の上位バイトを待ったフレーム数だけ減らし（ノコギリの形で1つ上のバンクへ移ることがあります）、下位バイトを1つ進めた場所です。同じ場所で待っていて同じ読み始めの場所を狙えば、何フレーム目にそこへ着いたかに関係なく、読む場所は同じになります（ほかの状態が違えば、そのあとの動きが変わることはあります）。いまのTASの経路（$1B:B476）にだけ、押すフレームを添えています。</p>
     <div class="scroll"><table>
       <thead><tr><th>入口</th><th>押し方（ボタン待ちの場所 → 押したときに読み始める場所）</th><th>押す回数</th><th>最後の入力（発火から）</th></tr></thead>
       <tbody>
@@ -571,7 +569,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   </figure>
   <figure class="fig">
     <h3>方法②：処理スクリプトの命令から直接呼ぶ（未確認）</h3>
-    <p class="small"><code>40 70</code> の処理は、中で <span class="mono">$03:800F</span> を呼んでいるだけです（<code>40 6F</code> は <span class="mono">$03:800C</span>）。スクリプトとは別に、番地を指定してプログラムを呼び出せる仕組みがあれば、<code>40 70</code> を読ませなくてもエンディングは始まります。その仕組みが「処理スクリプト」（補足「処理スクリプトと暴走」）の3番の命令です。</p>
+    <p class="small"><code>40 70</code> と <code>40 6F</code> の処理は、中でそれぞれ <span class="mono">$03:800F</span>・<span class="mono">$03:800C</span> を呼んでいるだけです。スクリプトとは別に、番地を指定してプログラムを呼び出せる仕組みがあれば、<code>40</code> を読ませなくてもエンディングは始まります。その仕組みが「処理スクリプト」（補足「処理スクリプトと暴走」）の3番の命令です。</p>
     <div class="scroll"><table>
       <thead><tr><th>分かっていること</th><th>分かっていないこと</th></tr></thead>
       <tbody>
