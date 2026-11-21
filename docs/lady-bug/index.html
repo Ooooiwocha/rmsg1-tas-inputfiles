@@ -514,7 +514,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
         
       </tbody>
     </table></div>
-    <figcaption><code>40 70</code> というバイト列はスクリプトの領域に8か所あります（$1A:E3F8、<wbr>$1B:AE33、AF88、B0B3、B1BE、B280、B3C2、B476）。どれに合わせても同じ命令が実行されます。少し手前に入っても、間の命令を読み進んで <code>40 70</code> に届く場合がありますが、途中でフレームを使う命令があると読む場所がまたずれるので、場所ごとに確かめる必要があります。</figcaption>
+    <figcaption><code>40 70</code> というバイト列はスクリプトの領域に8か所あります（$1A:E3F8、<wbr>$1B:AE33、AF88、B0B3、B1BE、B280、B3C2、B476）。どれに合わせても同じ命令が実行されます。命令 <code>40</code> は次のバイトの最上位ビットを無視するので、<code>40 F0</code> は <code>40 70</code>、<code>40 EF</code> は <code>40 6F</code> と同じ処理が選ばれます（番号を2倍した下位8ビットが、どちらも同じになるためです。そのあとの状態まで同じになるとは限りません）。バンク$19〜$1Bにある <code>40 F0</code>・<code>40 EF</code> は <span class="mono">$19:942D</span> の1か所だけです。少し手前に入っても、間の命令を読み進んで <code>40 70</code> に届く場合がありますが、途中でフレームを使う命令があると読む場所がまたずれるので、場所ごとに確かめる必要があります。</figcaption>
     <h3>止まればよいボタン待ちの候補</h3>
     <p class="small">スクリプトのある3つのバンクで、必要な下位バイトの位置に <code>12</code>（ボタン待ち）がある場所を数えました。B476を狙う場合の候補は5か所です（$1A:8775、<wbr>$1A:CF75、<wbr>$1B:8175、<wbr>$1B:8C75、<wbr>$1B:C275）。TASが使ったのは最後の1つです。</p>
     <div class="scroll"><table>
@@ -556,7 +556,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <tr><td><span class="mono">$1B:B476</span><br><span class="muted small">40 70・TAS</span></td><td class="mono small">$1A:B917→$1A:A718 <span class="muted">7,215F</span><br>$1A:A71C→$1A:A41D <span class="muted">7,218F</span><br>$1A:A428→$1A:A129 <span class="muted">7,221F</span><br>$1A:B825→$1A:B426 <span class="muted">7,227F</span><br>$1A:B430→$1A:AC31 <span class="muted">7,235F</span><br><span class="muted">（文章の途中で X → $1A:B6AD）　7,244F</span><br><span class="muted">（文章の途中で X → $1A:ABB4）　7,255F</span><br>$1B:C275→$1B:B476 <span class="muted">7,278F</span></td><td class="n">8</td><td class="n">83<br><span class="muted small">TASでは7,278F</span></td></tr>
       </tbody>
     </table></div>
-    <figcaption>「最後の入力」は、発火（12枚目のメモが書き換わるフレーム、TASでは7,195F）を0として数えたフレームです。TASの行に添えたフレームと「TASでは」の値は、入力ファイルの行の番号（0始まり）です。<code>40 70</code> の経路は、どれも最後のAを押したフレーム、または数フレーム後にエンディングの処理（<span class="mono">$03:8D63</span>）へ入ることを、最初から通しで実行して確かめました。<code>40 6F</code> の経路（$1A:BB57）は、7,290Fに <code>40</code> を読んでエピローグから始まり、エンディングの処理に入るのは8,006Fです。この経路は、別のチャットで行った探索の結果を、こちらで通しで実行して確かめたものです。押し方の欄で「文章の途中で X」とあるのは、ボタン待ちではなく、文字を書いている途中で押すもの（TASの7,244F・7,255F）です。$1B:AE33 へ入る経路は押下が3回で、見つかっている中で最も少ない操作です。$1B:B1BE の経路は、ランダムに押した試行でたまたま見つかったものを、必要な押下だけに絞りました。なお、命令 <code>40</code> は次のバイトの最上位ビットを無視するので、<code>40 F0</code> は <code>40 70</code>、<code>40 EF</code> は <code>40 6F</code> と同じ処理が選ばれます（番号を2倍した下位8ビットが、どちらも同じになるためです。そのあとの状態まで同じになるとは限りません）。バンク$19〜$1Bにある <code>40 F0</code>・<code>40 EF</code> は <span class="mono">$19:942D</span> の1か所だけです。</figcaption>
+    <figcaption>「最後の入力」は、発火（12枚目のメモが書き換わるフレーム、TASでは7,195F）を0として数えたフレームです。TASの行に添えたフレームと「TASでは」の値は、入力ファイルの行の番号（0始まり）です。<code>40 70</code> の経路は、どれも最後のAを押したフレーム、または数フレーム後にエンディングの処理（<span class="mono">$03:8D63</span>）へ入ることを、最初から通しで実行して確かめました。<code>40 6F</code> の経路（$1A:BB57）は、7,290Fに <code>40</code> を読んでエピローグから始まり、エンディングの処理に入るのは8,006Fです。この経路は、別のチャットで行った探索の結果を、こちらで通しで実行して確かめたものです。押し方の欄で「文章の途中で X」とあるのは、ボタン待ちではなく、文字を書いている途中で押すもの（TASの7,244F・7,255F）です。$1B:AE33 へ入る経路は押下が3回で、見つかっている中で最も少ない操作です。$1B:B1BE の経路は、ランダムに押した試行でたまたま見つかったものを、必要な押下だけに絞りました。</figcaption>
   </figure>
   <figure class="fig">
     <h3>方法②：処理スクリプトの命令から直接呼ぶ（未確認）</h3>
