@@ -17,12 +17,11 @@
 <meta name="twitter:description" content="ロマンシング サ・ガ（SFC・日本版）のレイディバグの仕組みを、図と表で解説。12枚目のメモがプレイ時間カウンタと重なり、1フレームごとに読む場所が256バイトずれる。ROMとエミュレーターで確かめた内容です。">
 <meta name="twitter:image" content="https://ooooiwocha.github.io/rmsg1-tas-inputfiles/lady-bug/img/ogp2.png">
 <style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
-</head>
-<body>
 <title>レイディバグはなぜ起きるのか 生成AIのClaudeが解説</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=IBM+Plex+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<meta name="claude:viewport-fit-sides" content="cover">
 <style>
+a{color:var(--accent);text-underline-offset:3px}
 /* layout: one reading column; each chapter = short text + one figure. Figures use the game's own vocabulary: hex bytes, a stack of records, a tape of 256-byte pages */
 :root{
   --bg:#f2f4f9; --surface:#ffffff; --ink:#1b2140; --muted:#5a6282; --line:#d3d9e8;
@@ -150,6 +149,8 @@ table.path .late{color:var(--hot);font-weight:600;outline:1.5px solid var(--hot)
 .score{font-family:var(--f-mono);font-size:14px;color:var(--muted)}
 footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
 </style>
+</head>
+<body>
 
 <main>
 <header style="display:flex;flex-direction:column;gap:16px">
@@ -522,7 +523,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <thead><tr><th>副命令</th><th>飛び先</th><th>始まる場面</th></tr></thead>
       <tbody>
         <tr><td><code>40 70</code></td><td class="mono">$03:800F</td><td>風景とスタッフロール</td></tr>
-        <tr><td><code>40 6F</code></td><td class="mono">$03:800C</td><td>城と港の会話（エピローグ）。無入力のまま約6,100フレーム後に、<code>40 70</code> と同じスタッフロールへ着く</td></tr>
+        <tr><td><code>40 6F</code></td><td class="mono">$03:800C</td><td>城と港の会話（エピローグ）。無入力のまま進み、エピローグのスクリプトの最後にある <code>40 70</code>（$1B:B1BE）を読んで、そこから先は <code>40 70</code> と同じになる。$1A:BB57 の経路では、7,290Fに <code>40 6F</code> を読み、716フレーム後の8,006Fにこの <code>40 70</code> を読む</td></tr>
       </tbody>
     </table></div>
     <p class="small">ムービーの長さは最後の入力で決まるので、どちらの入口も同じ条件で比べられます。この並びがある場所に読む場所を合わせれば、エンディングが始まります。読む場所は直接指定できないので、「決まった下位バイトのボタン待ちに止まる」ことが本質的な条件です。止まれさえすれば、あとは待つフレーム数で合わせられます。</p>
@@ -773,7 +774,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     </div>
     <p class="small">10回目の追い返しでは、7,197Fに読まれるのは赤い <span class="mono">FF</span>（$1A:FF7F に書かれた値）ではありません。時計が減らすのは「読む場所」のアドレスのほうです。2フレームの間に、アドレスの上位バイトが FF から FD に下がるので、読む場所が $1A:FF7F から $1A:FD7F に変わります。$1A:FD7F はこのスクリプトの外で、そこに書かれている値は 8F です。その結果、命令は <span class="mono">00 FF</span> ではなく <span class="mono">00 8F</span> として実行されます。</p>
     <p class="small">まぎらわしいのですが、ここには FF が2つ出てきます。アドレス $1A:<b>FF</b>7F の上位バイトの FF と、その場所に書かれている値の FF です。時計で変わるのは前者だけで、ROMに書かれた値は変わりません。FF が 8F に減るのではなく、読む場所がずれて、別の場所にあった 8F を読む、ということです。</p>
-    <figcaption>主人公が違うブロックでは <code>1E 0B</code> と <code>00 FF</code> が両方飛ばされ、次のブロックへ進みます。主人公が合うブロックでは、<code>1E 0B</code> を実行し、<code>00 FF</code> で終わります。ホークの場合、先頭から4番目のブロックの <code>00</code>（$1A:FF7E）まで、$1A:FF48 からの55バイトを同じフレームのうちに読みます（読む場所は54バイト進みます）。$1701 は音を鳴らす処理に渡す番号の置き場所です。変数0x40〜0x47が主人公を表していること（ホーク以外では未確認）と、<code>1E 0B</code> が曲を切り替える処理であることは、並びからの推定です。</figcaption>
+    <figcaption>主人公が違うブロックでは <code>1E 0B</code> と <code>00 FF</code> が両方飛ばされ、次のブロックへ進みます。主人公が合うブロックでは、<code>1E 0B</code> を実行し、<code>00 FF</code> で終わります。ホークの場合、先頭の $1A:FF48 から54バイト先の $1A:FF7E まで、条件判定で読み飛ばす部分も含めて同じフレームのうちに進み、4番目のブロックの <code>00</code>（$1A:FF7E）を読みます。$1701 は音を鳴らす処理に渡す番号の置き場所です。変数0x40〜0x47が主人公を表していること（ホーク以外では未確認）と、<code>1E 0B</code> が曲を切り替える処理であることは、並びからの推定です。</figcaption>
   </figure>
   <details class="aside">
     <summary>余談：スクリプト0x194は、なぜこんな書き方なのか</summary>
@@ -828,6 +829,19 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   </figure>
 </section>
 
+<section>
+  <div class="eyebrow">検証資料</div>
+  <h2>入力ファイルと検証用のファイル</h2>
+  <ul class="plain small">
+    <li><a href="https://raw.githubusercontent.com/Ooooiwocha/rmsg1-tas-inputfiles/main/latest/RS1_BizHawk_tail_search_x_7279F_verified.bk2">7,279F版の入力ファイル（.bk2）</a>　BizHawk 2.11.1 で再生できます。</li>
+    <li><a href="https://github.com/Ooooiwocha/rmsg1-tas-inputfiles/blob/main/docs/lady-bug/commands.md">イベントスクリプトの命令一覧（実測）</a>　命令60種類と副命令の引数の数・所要フレーム、エンディングに入る場所。</li>
+    <li><a href="https://github.com/Ooooiwocha/rmsg1-tas-inputfiles/blob/main/docs/lady-bug/freezes.md">フリーズ・暴走の分類</a>　押し方によって止まる・暴走する場合の種類と原因。</li>
+    <li><a href="https://github.com/Ooooiwocha/rmsg1-tas-inputfiles/blob/main/docs/lady-bug/ladybug-tools.lua">ladybug-tools.lua</a>　BizHawk用の検証スクリプト。暗転中も画面を見えるようにし、フリーズと長い待ちを検出し、いま読んでいるメモが何枚目かを表示します。下の2本を1本にまとめたものです。</li>
+    <li><a href="https://github.com/Ooooiwocha/rmsg1-tas-inputfiles/blob/main/docs/lady-bug/keep-bright.lua">keep-bright.lua</a>（暗転中も画面を見えるようにする）、<a href="https://github.com/Ooooiwocha/rmsg1-tas-inputfiles/blob/main/docs/lady-bug/freeze-detect.lua">freeze-detect.lua</a>（フリーズと長い待ちを検出する）</li>
+    <li><a href="https://github.com/Ooooiwocha/rmsg1-tas-inputfiles">リポジトリ全体</a>　過去の版の入力ファイルと短縮の履歴。</li>
+  </ul>
+</section>
+
 <footer>アドレスは日本版ROMのもの、フレーム番号はTAS入力ファイル（7,279F版）の行番号です。イベント処理が読んだバイトを1つずつ記録する方法と、プログラムの逆アセンブルで確かめました。</footer>
 </main>
 
@@ -861,7 +875,7 @@ function drawStack(){
   say.textContent= over?'10回目の途中でスクリプト0x173がスクリプト0x194を呼び、12枚目のメモが時計の上に書かれました。ここからバグが始まります。'
     : n===0?'まだ何も積まれていません。港に入ってみましょう。'
     : n<10?'スクリプト0x173は戻らないまま、次の港のイベントが同じ段で始まります。下の段にはスクリプト0x2E8のメモが残ります。'
-    : '10回追い返されました。メモは1〜11枚目まで埋まっています。この途中でスクリプト0x173がもう1つスクリプトを呼ぶと…';
+    : '10回追い返されました（ページを開いた時点ではこの状態です。「最初から」を押すと0回から積めます）。メモは1〜11枚目まで埋まっています。この途中でスクリプト0x173がもう1つスクリプトを呼ぶと…';
 }
 bPush.onclick=()=>{ if(n<10)n++; else over=true; drawStack() };
 document.getElementById('btnReset').onclick=()=>{n=0;over=false;drawStack()};
