@@ -554,7 +554,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
         <tr><td><span class="mono">$1B:B476</span><br><span class="muted small">TAS（Xを2回含む）</span></td><td class="mono">7215・7218・7221・7227・7235・7244・7255・7278</td><td class="n">8</td><td class="n">7,278F</td></tr>
       </tbody>
     </table></div>
-    <figcaption>フレームは入力ファイルの行の番号（0始まり）です。どれも最後のAを押したフレーム、または数フレーム後にエンディングの処理（<span class="mono">$03:8D63</span>）へ入ることを、最初から通しで実行して確かめました。$1B:AE33 へ入る経路は押下が3回で、見つかっている中で最も少ない操作です。$1B:B1BE の経路は、ランダムに押した試行でたまたま見つかったものを、必要な押下だけに絞りました。</figcaption>
+    <figcaption>フレームは入力ファイルの行の番号（0始まり）です。どれも最後のAを押したフレーム、または数フレーム後にエンディングの処理（<span class="mono">$03:8D63</span>）へ入ることを、最初から通しで実行して確かめました。$1B:AE33 へ入る経路は押下が3回で、見つかっている中で最も少ない操作です。$1B:B1BE の経路は、ランダムに押した試行でたまたま見つかったものを、必要な押下だけに絞りました。なお、命令 <code>40</code> は次のバイトの最上位ビットを無視するので、<code>40 F0</code> は <code>40 70</code>、<code>40 EF</code> は <code>40 6F</code> と同じ動きになります。バンク$19〜$1Bにある <code>40 F0</code>・<code>40 EF</code> は <span class="mono">$19:942D</span> の1か所だけです。</figcaption>
   </figure>
   <figure class="fig">
     <h3>方法②：処理スクリプトの命令から直接呼ぶ（未確認）</h3>
@@ -713,7 +713,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   <div class="scroll"><table>
     <thead><tr><th>型</th><th>引く表</th><th>でたらめになる値</th><th>結果</th></tr></thead>
     <tbody>
-      <tr><td>命令 <code>40</code> の次のバイトが範囲外</td><td>命令 <code>40</code> の処理の一覧（<span class="mono">00</span>〜<span class="mono">79</span>）</td><td><code>40</code> の次のバイト</td><td>でたらめな番地へ直接飛ぶ</td></tr>
+      <tr><td>命令 <code>40</code> の次のバイトが範囲外</td><td>命令 <code>40</code> の処理の一覧（<span class="mono">00</span>〜<span class="mono">79</span>）。番号を2倍した下位8ビットで引くので、<span class="mono">80</span>以上は<span class="mono">80</span>を引いた番号と同じ扱いになり、範囲外は <span class="mono">7A</span>〜<span class="mono">7F</span> と <span class="mono">FA</span>〜<span class="mono">FF</span> だけ</td><td><code>40</code> の次のバイト</td><td>でたらめな番地へ直接飛ぶ</td></tr>
       <tr><td>でたらめな番号の処理スクリプト</td><td>処理スクリプトの場所の一覧</td><td><code>1E</code> の次のバイト</td><td>処理スクリプトをROMの外から読み始める。たいてい次の型に続く</td></tr>
       <tr><td>処理スクリプトの中の、範囲外の命令</td><td>処理スクリプトの命令の一覧（<span class="mono">0</span>〜<span class="mono">C</span>）</td><td>処理スクリプトの1バイト</td><td>でたらめな番地へ直接飛ぶ</td></tr>
       <tr><td>呼び出していないのに「戻る」</td><td>（表ではなく、控えの場所）</td><td>6番の命令が読む控え</td><td>読み取り位置がRAMへ移り、上の型に続く</td></tr>
