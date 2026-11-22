@@ -538,7 +538,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     <div class="scroll"><table>
       <thead><tr><th>条件</th><th>内容</th><th>例：TASの $1B:B476（<code>40 70</code>）</th></tr></thead>
       <tbody>
-        <tr><td>1. 下位バイト<br><span class="muted small">（これが難関）</span></td><td><code>40</code> の位置の下位バイトより1小さい位置にあるボタン待ちで止まる（押すと次の位置から読む）。<code>40</code> の1つ手前のバイトが、同じフレームのうちに読み終わる命令（文字1つ分など）なら、2小さい位置でもよい</td><td>3回ジャンプして、下位バイトが75の <wbr>$1B:C275 のボタン待ちに止まる</td></tr>
+        <tr><td>1. 下位バイト<br><span class="muted small">（これが難関）</span></td><td><code>40</code> の位置の下位バイトより1小さい位置にあるボタン待ちで止まる（押すと次の位置から読む）（場所によっては2小さい位置でもよい。下の表）</td><td>3回ジャンプして、下位バイトが75の <wbr>$1B:C275 のボタン待ちに止まる</td></tr>
         <tr><td>2. 押すフレーム</td><td>読む場所の上位バイトが <code>40</code> の位置と同じになるフレームで押す。同じバンクで上位が大きければ、減るのを待つ。そうでなくても、待ち続ければバンクを行きつ戻りつするので、いずれ同じ場所を通る</td><td>C2からB4まで減るのを14フレーム待ってAを押す</td></tr>
       </tbody>
     </table></div>
@@ -551,15 +551,15 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
         <tr><td class="mono">$1A:E3F8</td><td><code>40 70</code></td><td class="mono">F7</td><td class="n">3</td><td class="n">1</td><td class="n">0</td></tr>
         <tr><td class="mono">$1B:AE33</td><td><code>40 70</code></td><td class="mono">32</td><td class="n">4</td><td class="n">2</td><td class="n">1</td></tr>
         <tr><td class="mono">$1B:AF88</td><td><code>40 70</code></td><td class="mono">87</td><td class="n">4</td><td class="n">0</td><td class="n">3</td></tr>
-        <tr><td class="mono">$1B:B0B3</td><td><code>40 70</code></td><td class="mono">B2</td><td class="n">2</td><td class="n">0</td><td class="n">0</td></tr>
+        <tr><td class="mono">$1B:B0B3</td><td><code>40 70</code></td><td class="mono">B2（B1も可）</td><td class="n">2</td><td class="n">0</td><td class="n">0</td></tr>
         <tr><td class="mono">$1B:B1BE</td><td><code>40 70</code></td><td class="mono">BD</td><td class="n">5</td><td class="n">1</td><td class="n">0</td></tr>
         <tr><td class="mono">$1B:B280</td><td><code>40 70</code></td><td class="mono">7F</td><td class="n">2</td><td class="n">5</td><td class="n">1</td></tr>
         <tr><td class="mono">$1B:B3C2</td><td><code>40 70</code></td><td class="mono">C1</td><td class="n">1</td><td class="n">0</td><td class="n">0</td></tr>
-        <tr><td class="mono">$1B:B476</td><td><code>40 70</code><br><span class="muted small">TAS</span></td><td class="mono">75</td><td class="n">2</td><td class="n">3</td><td class="n">0</td></tr>
+        <tr><td class="mono">$1B:B476</td><td><code>40 70</code><br><span class="muted small">TAS</span></td><td class="mono">75（74も可）</td><td class="n">2</td><td class="n">3</td><td class="n">0</td></tr>
         <tr><td class="mono">$1D:CE4D</td><td><code>40 6F</code><br><span class="muted small">データの中の偶然の並び</span></td><td class="mono">4C</td><td class="n">2</td><td class="n">1</td><td class="n">1</td></tr>
       </tbody>
     </table></div>
-    <figcaption>$1A:BB57 は本物のスクリプトの中にある <code>40 6F</code>（直前は暗転とウィンドウを閉じる命令）、$1B:B476 は本物のエンディング演出のスクリプト（0x277）の最後にある <code>40 70</code> です。同じ並びなら、どの場所に合わせても同じ処理が選ばれます。命令 <code>40</code> は次のバイトの最上位ビットを無視するので、<code>40 F0</code> は <code>40 70</code>、<code>40 EF</code> は <code>40 6F</code> と同じ処理が選ばれます（番号を2倍した下位8ビットが、どちらも同じになるためです。そのあとの状態まで同じになるとは限りません）。バンク$19〜$1Bにある <code>40 F0</code>・<code>40 EF</code> は <span class="mono">$19:942D</span> の1か所だけです。<br>候補の場所は、<wbr>$1A:BB57 狙いが $1A:A056、<wbr>$1A:CB56、<wbr>$1A:F256、<wbr>$1A:F656、<wbr>$1B:D356、<wbr>$1C:B256、<wbr>$1D:CE4D 狙いが $1A:9A4C、<wbr>$1A:C04C、<wbr>$1B:834C、<wbr>$1C:C34C です。1つ手前から入る例として、$1B:B0B3 の経路は $1B:B0B2 の <code>80</code>（文字1つ分）から読み始め、同じフレームのうちに <code>40 70</code> を読んでエンディングに入っています。TASの $1B:B476 でも、手前の $1B:B475 は <code>70</code>（文字1つ分）なので、下位バイトが74のボタン待ちから入っても同じ7,278Fにエンディングに入ることを、読む場所の下位バイトを書き換えて確かめました（2つ手前の $1B:B474 は <code>14</code> で、次のバイトを引数として読んでしまうので届きません）。$1A:E3F8・$1B:AF88 の手前は <code>40</code> なので、<code>40 40</code> という別の命令になり、この余地はありません。値が <code>12</code> でも別の命令の引数やスクリプトでないデータの場合があり、そこに命令の先頭として行き着く道筋があるかは場所ごとに探す必要があります。少し手前に入っても、間の命令を読み進んで <code>40</code> に届く場合がありますが、途中でフレームを使う命令があると読む場所がまたずれます。$1D:CE4D はバンク$1Dを実測していないため、まだ調べていません。</figcaption>
+    <figcaption>$1A:BB57 は本物のスクリプトの中にある <code>40 6F</code>（直前は暗転とウィンドウを閉じる命令）、$1B:B476 は本物のエンディング演出のスクリプト（0x277）の最後にある <code>40 70</code> です。同じ並びなら、どの場所に合わせても同じ処理が選ばれます。命令 <code>40</code> は次のバイトの最上位ビットを無視するので、<code>40 F0</code> は <code>40 70</code>、<code>40 EF</code> は <code>40 6F</code> と同じ処理が選ばれます（番号を2倍した下位8ビットが、どちらも同じになるためです。そのあとの状態まで同じになるとは限りません）。バンク$19〜$1Bにある <code>40 F0</code>・<code>40 EF</code> は <span class="mono">$19:942D</span> の1か所だけです。<br>候補の場所は、<wbr>$1A:BB57 狙いが $1A:A056、<wbr>$1A:CB56、<wbr>$1A:F256、<wbr>$1A:F656、<wbr>$1B:D356、<wbr>$1C:B256、<wbr>$1D:CE4D 狙いが $1A:9A4C、<wbr>$1A:C04C、<wbr>$1B:834C、<wbr>$1C:C34C です。「（B1も可）」は、<code>40</code> の1つ手前のバイトが同じフレームのうちに読み終わる文字の命令なので、下位バイトが1小さいボタン待ちから入っても届くことを確かめたものです。候補の数は、左に書いた下位バイトのものです。値が <code>12</code> でも別の命令の引数やスクリプトでないデータの場合があり、そこに命令の先頭として行き着く道筋があるかは場所ごとに探す必要があります。少し手前に入っても、間の命令を読み進んで <code>40</code> に届く場合がありますが、途中でフレームを使う命令があると読む場所がまたずれます。$1D:CE4D はバンク$1Dを実測していないため、まだ調べていません。</figcaption>
   </figure>
   <figure class="fig">
     <h3>方法①の実例：実際に届いた入口</h3>
