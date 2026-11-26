@@ -1,24 +1,35 @@
-このREADMEは当初ChatGPTが自動生成したものです。7,290F版と7,279F版への更新（最新版の項目・制作記録・一覧の更新）は、AnthropicのAIアシスタントClaudeが行いました（この注記はClaudeによる追記）。
+このREADMEは当初ChatGPTが自動生成したものです。7,290F版・7,279F版・7,262F版への更新（最新版の項目・制作記録・一覧の更新）は、AnthropicのAIアシスタントClaudeが行いました（この注記はClaudeによる追記）。
 
 # ロマンシング サ・ガ TAS 入力ファイル
 
 BizHawk用の入力ファイル（`.bk2`）と、その短縮履歴です。
 
-## まず再生するなら：7,279F版
+## まず再生するなら：7,262F版
 
-**[最新・最良の7,279F版をダウンロード](https://raw.githubusercontent.com/Ooooiwocha/rmsg1-tas-inputfiles/main/latest/RS1_BizHawk_tail_search_x_7279F_verified.bk2)**
+**[最新・最良の7,262F版をダウンロード](https://raw.githubusercontent.com/Ooooiwocha/rmsg1-tas-inputfiles/main/latest/RS1_BizHawk_front_trim_7262F_verified.bk2)**
 
-- ファイル：`RS1_BizHawk_tail_search_x_7279F_verified.bk2`
-- 前の7,290F版から **11F短縮**、7,325F版から **46F短縮**。収録中の7,780F版から **501F短縮**。
-- エンディング入口（$038D63）の実行到達はCPUフレーム7,278（入力の7,279F目を実行中）。
-- 7,197F目までの入力は7,325F版・7,290F版と完全に同一です。変更したのはバグ発火後の部分だけです。
+- ファイル：`RS1_BizHawk_front_trim_7262F_verified.bk2`
+- 前の7,263F版から **1F短縮**、7,279F版から **17F短縮**。収録中の7,780F版から **518F短縮**。
+- エンディング入口（$038D63）の実行到達はCPUフレーム7,261。
+- バグ発火後の8回の押下は7,279F版と同じ並びで、すべて17F早くなっています（7,198F A、7,201F A、7,204F A、7,210F A、7,218F A、7,227F X、7,238F X、7,261F A。行番号は0始まり）。
 - 現時点で確認できている最良の入力です。絶対最短を証明したものではありません。
+
+### 7,273F版・7,263F版・7,262F版の経緯
+
+- **7,273F版**（`archive/candidate_7273.bk2`）と **7,263F版**（`archive/RomancingSaGa_7263F_BizHawk.bk2`）は、MetaのAIのMuseが作った更新案です。7,273F版はバグ発火前の前半を詰めて6F、7,263F版はさらに追い返しの周期の間の待ちを詰めて10F縮めています。追い返しの区間にはフレームルールがあり、一定以上早くならないと結果に反映されません。
+- **7,262F版**は、Claudeが7,263F版の前半から待ちを1F削ったものです。あわせて、前半で浮かせられる待ち（移動の押しっぱなしの長すぎる部分など）を、フレームルールに吸収されても構わない前提で詰められるだけ詰めています。浮いたフレームは、港で船が動く演出や追い返しの周期などで吸収されるため、全体の長さはそれ以上縮みませんでした。A連打の一部を押しっぱなしに置き換えた箇所がありますが、結果は同じです。
+
+### 7,262F版の検証内容
+
+- BizHawk 2.11.1のBSNESv115+コアを直接呼ぶ計測ホストで電源投入から再生し、$038D63の実行がCPUフレーム7,261で起きること、その後32,000F無入力で進めてタイトル画面に戻ることを確認しました。
+- 前半を詰めた各手は、エンディング入口のフレームとバグ発火の行が変わらないことを1手ずつ確認しています。
+- EmuHawk本体でのムービー再生による確認は、この版ではまだ行っていません。
 
 ## レイディバグの仕組みの解説
 
 **[レイディバグはなぜ起きるのか 生成AIのClaudeが解説](docs/lady-bug/index.html)**
 
-- バグの原因、発火後の動き、7,279F版がエンディングに入るまでの命令の連鎖を、図・アニメーション・ゲーム画面で説明したページです。AnthropicのAIアシスタントClaudeが、エミュレーター上の実行記録とプログラムの逆アセンブルをもとに作成しました（2026年11月14日）。
+- バグの原因、発火後の動き、7,279F版がエンディングに入るまでの命令の連鎖（7,262F版も発火後は同じ経路です）を、図・アニメーション・ゲーム画面で説明したページです。AnthropicのAIアシスタントClaudeが、エミュレーター上の実行記録とプログラムの逆アセンブルをもとに作成しました（2026年11月14日）。
 - HTMLファイルなので、GitHub上ではソースが表示されます。`docs/lady-bug/index.html` をダウンロードしてブラウザーで開くと、図つきで読めます。
 - [イベントスクリプトの命令一覧（実測）](docs/lady-bug/commands.md)：スクリプトの命令60種類と副命令について、引数の数と所要フレームを実測した表です。スクリプト領域の全131,072バイトを1命令ずつ実行させて集計しました。これもClaudeが作成しました。
 - すべてエミュレーター（BizHawk 2.11.1、BSNESv115+）上の結果で、未確認の点はページ内に明記しています。
@@ -46,7 +57,7 @@ BizHawk用の入力ファイル（`.bk2`）と、その短縮履歴です。
   - 同じ状態かどうかは、イベント記録の一部（命令位置の下位バイト・終了位置・タイマーの位相）で判定しています。探索の結果は条件内のものであり、最短性の証明ではありません。
 - 追い返しループ（約5,299〜7,180F）の各Aは、1F早めるとどれも失敗することも確認しています。冒頭の無入力区間（325〜1,427F）は、どのボタンでも進行が変わらないことを確認しています。バグ発火直前（7,170〜7,198F）にA以外の入力をしても、最初の待ちの状態は変わりませんでした。
 
-### 最新版の検証内容
+### 7,279F版の検証内容
 
 - 計測ホストで電源投入から別プロセスで2回、38,000Fまで再生しました。7,700F・12,000F・20,000F・26,000F・38,000Fの5地点で、全WRAMのSHA-256が2回とも一致しています。
 - 12,000Fと20,000Fでスタッフロール、26,000Fと38,000Fでタイトルロゴを確認しました。タイトルには、以前の版と同じく黒いマスク状の領域が残ります。
@@ -55,7 +66,7 @@ BizHawk用の入力ファイル（`.bk2`）と、その短縮履歴です。
 
 ### 再生環境
 
-最新BK2のヘッダーに記録されている環境：
+最新BK2のヘッダーに記録されている環境（7,262F版も同じ）：
 
 - BizHawk **2.11.1**
 - コア：**BSNESv115+**
@@ -66,37 +77,40 @@ BizHawk用の入力ファイル（`.bk2`）と、その短縮履歴です。
 ## フォルダの案内
 
 - [latest/](latest/)：最新・最良の検証済み入力を1件だけ置きます。
-- [archive/](archive/)：過去の入力18件を、比較・記録用に残しています。
+- [archive/](archive/)：過去の入力21件を、比較・記録用に残しています。
 
 新記録ができたら、新版を `latest/` に置き、前の最新版を `archive/` に移します。このREADMEの最新版リンク・フレーム数・検証情報・一覧も同時に更新します。
 
 ## 入力ファイル一覧・短縮履歴
 
-フレーム数が少ない順です。全19ファイルを掲載しています。
+フレーム数が少ない順です。全22ファイルを掲載しています。
 F数は入力ログの長さ（操作終了の目安）で、エンディング映像末尾までの時間ではありません。
-「最良との差」は7,279Fとの差分です。説明はファイル名の識別用ラベルを日本語にしたものです。
+「最良との差」は7,262Fとの差分です。説明はファイル名の識別用ラベルを日本語にしたものです。
 
 | フレーム数 | 最良との差 | 識別用の説明 | ダウンロード |
 | ---: | ---: | --- | --- |
-| 7,279F | — | バグ発火後の押下時刻とボタンの探索（X使用、Claude作成、現時点の最良） | [BK2](latest/RS1_BizHawk_tail_search_x_7279F_verified.bk2) |
-| 7,290F | +11F | バグ発火後のA押下時刻の探索（Claude作成） | [BK2](archive/RS1_BizHawk_tail_search_7290F_verified.bk2) |
-| 7,325F | +46F | リセット49F＋移動・待機の接続調整 | [BK2](archive/RS1_BizHawk_reset49_connected_7325F_verified.bk2) |
-| 7,337F | +58F | 町内移動の左分岐調整 | [BK2](archive/RS1_BizHawk_town_split_left_7337F_verified.bk2) |
-| 7,371F | +92F | 早期退室＋待機短縮 | [BK2](archive/RS1_BizHawk_early_room_exit_waittrim_7371F_verified.bk2) |
-| 7,381F | +102F | 早期退室＋船 | [BK2](archive/RS1_BizHawk_early_room_exit_boat_7381F_verified.bk2) |
-| 7,388F | +109F | 早期退出＋待機短縮 | [BK2](archive/RS1_BizHawk_early_exit_waittrim_7388F_verified.bk2) |
-| 7,392F | +113F | 会話の早期退出＋船 | [BK2](archive/RS1_BizHawk_early_dialogue_exit_boat_7392F_verified.bk2) |
-| 7,439F | +160F | 最初の出港経路・船移動の調整 | [BK2](archive/RS1_BizHawk_first_departure_edge_mirror_boat_7439F_verified.bk2) |
-| 7,456F | +177F | NPC位相＋船 | [BK2](archive/RS1_BizHawk_npc_phase_boat_7456F_verified.bk2) |
-| 7,458F | +179F | NPC位相＋船 | [BK2](archive/RS1_BizHawk_npc_phase_boat_7458F_verified.bk2) |
-| 7,473F | +194F | 北側上陸 | [BK2](archive/RS1_BizHawk_north_landing_7473F.bk2) |
-| 7,490F | +211F | エンディング到達経路の変更 | [BK2](archive/RS1_BizHawk_alternate_ending_7490F.bk2) |
-| 7,502F | +223F | 東移動32／船操作42 | [BK2](archive/RS1_BizHawk_east32_boatrow42_7502F.bk2) |
-| 7,536F | +257F | 最初のマップA | [BK2](archive/RS1_BizHawk_first_map_A_7536F.bk2) |
-| 7,537F | +258F | 会話待機サイクル | [BK2](archive/RS1_BizHawk_meeting_wait_cycle_7537F.bk2) |
-| 7,554F | +275F | オープニングマップ | [BK2](archive/RS1_BizHawk_opening_map_7554F.bk2) |
-| 7,599F | +320F | 最初の会話スクロール | [BK2](archive/RS1_BizHawk_first_meeting_scroll_7599F.bk2) |
-| 7,780F | +501F | 会話調整 | [BK2](archive/RS1_BizHawk_meeting_7780F.bk2) |
+| 7,262F | — | 前半の待ちの削除と詰め（Claude作成、現時点の最良） | [BK2](latest/RS1_BizHawk_front_trim_7262F_verified.bk2) |
+| 7,263F | +1F | 追い返しの周期の間の待ちを短縮（MetaのMuse作成） | [BK2](archive/RomancingSaGa_7263F_BizHawk.bk2) |
+| 7,273F | +11F | 前半の短縮（MetaのMuse作成） | [BK2](archive/candidate_7273.bk2) |
+| 7,279F | +17F | バグ発火後の押下時刻とボタンの探索（X使用、Claude作成） | [BK2](archive/RS1_BizHawk_tail_search_x_7279F_verified.bk2) |
+| 7,290F | +28F | バグ発火後のA押下時刻の探索（Claude作成） | [BK2](archive/RS1_BizHawk_tail_search_7290F_verified.bk2) |
+| 7,325F | +63F | リセット49F＋移動・待機の接続調整 | [BK2](archive/RS1_BizHawk_reset49_connected_7325F_verified.bk2) |
+| 7,337F | +75F | 町内移動の左分岐調整 | [BK2](archive/RS1_BizHawk_town_split_left_7337F_verified.bk2) |
+| 7,371F | +109F | 早期退室＋待機短縮 | [BK2](archive/RS1_BizHawk_early_room_exit_waittrim_7371F_verified.bk2) |
+| 7,381F | +119F | 早期退室＋船 | [BK2](archive/RS1_BizHawk_early_room_exit_boat_7381F_verified.bk2) |
+| 7,388F | +126F | 早期退出＋待機短縮 | [BK2](archive/RS1_BizHawk_early_exit_waittrim_7388F_verified.bk2) |
+| 7,392F | +130F | 会話の早期退出＋船 | [BK2](archive/RS1_BizHawk_early_dialogue_exit_boat_7392F_verified.bk2) |
+| 7,439F | +177F | 最初の出港経路・船移動の調整 | [BK2](archive/RS1_BizHawk_first_departure_edge_mirror_boat_7439F_verified.bk2) |
+| 7,456F | +194F | NPC位相＋船 | [BK2](archive/RS1_BizHawk_npc_phase_boat_7456F_verified.bk2) |
+| 7,458F | +196F | NPC位相＋船 | [BK2](archive/RS1_BizHawk_npc_phase_boat_7458F_verified.bk2) |
+| 7,473F | +211F | 北側上陸 | [BK2](archive/RS1_BizHawk_north_landing_7473F.bk2) |
+| 7,490F | +228F | エンディング到達経路の変更 | [BK2](archive/RS1_BizHawk_alternate_ending_7490F.bk2) |
+| 7,502F | +240F | 東移動32／船操作42 | [BK2](archive/RS1_BizHawk_east32_boatrow42_7502F.bk2) |
+| 7,536F | +274F | 最初のマップA | [BK2](archive/RS1_BizHawk_first_map_A_7536F.bk2) |
+| 7,537F | +275F | 会話待機サイクル | [BK2](archive/RS1_BizHawk_meeting_wait_cycle_7537F.bk2) |
+| 7,554F | +292F | オープニングマップ | [BK2](archive/RS1_BizHawk_opening_map_7554F.bk2) |
+| 7,599F | +337F | 最初の会話スクロール | [BK2](archive/RS1_BizHawk_first_meeting_scroll_7599F.bk2) |
+| 7,780F | +518F | 会話調整 | [BK2](archive/RS1_BizHawk_meeting_7780F.bk2) |
 
 ## ファイル名の読み方
 
@@ -113,7 +127,7 @@ F数は入力ログの長さ（操作終了の目安）で、エンディング�
 
 ## 最新版のファイル確認
 
-- サイズ：2,095 bytes
-- SHA-256：`4344d7c9a5af44fa2b53393f091080d18b84f905f3fcdc49af4070bf77c17885`
+- サイズ：2,085 bytes
+- SHA-256：`3fc34f77dc84d1bafa10e1b4cd538625a5aa81364714f89341d5c47bbf63d97d`
 
-過去18件のBK2は内容を変更せずに保存しています。前の最新版7,290Fは `archive/` に移しました。以前のroot直下や旧最新版へのリンクをお使いの場合は、このページのリンクに更新してください。
+過去のBK2は内容を変更せずに保存しています。前の最新版7,279Fと7,263Fは `archive/` に移しました。以前のroot直下や旧最新版へのリンクをお使いの場合は、このページのリンクに更新してください。

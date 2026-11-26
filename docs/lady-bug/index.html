@@ -286,7 +286,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   </figure>
   <figure class="fig">
     <h3>待ち続けたときに読む場所（押すフレームごと）</h3>
-    <p class="small">フレームは、バグの発火（12枚目のメモが書き換わるフレーム）を0として数えています。TASの前半が縮んでも、発火した時点のゲームの状態が同じなら、発火からのフレーム数で見れば同じ関係が成り立ちます（前半の違いで変わるのは音楽の再生位置くらいと見られますが、レイディバグ中は音の処理を呼ぶ場面もあるので、念のため確かめる必要があります）。かっこ内は、いまのTASでのフレーム番号です。</p>
+    <p class="small">フレームは、バグの発火（12枚目のメモが書き換わるフレーム）を0として数えています。TASの前半が縮んでも、発火した時点のゲームの状態が同じなら、発火からのフレーム数で見れば同じ関係が成り立ちます（前半を変えると、音楽の再生位置や音のCPUのずれ、17フレームで一周するフィールド処理のカウンタ（$181C）など、発火時点の状態が変わることがあります。6章のとおり、これらはバグ中の行き先を変えうるので、前半を変えたときは発火時点の状態がそろっているかを確かめる必要があります）。かっこ内は、いまのTASでのフレーム番号です。</p>
     <div class="readout">
       <div><small>押すフレーム（発火から）</small><b id="sF">5</b><small id="sFt" style="display:block;margin-top:2px">（TASでは7,200F）</small></div>
       <div><small>タイマー</small><b id="sC" style="color:var(--count)">0x1AB6</b></div>
@@ -443,7 +443,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
 <section class="part" style="border-top:3px solid var(--accent);padding-top:18px">
   <div class="eyebrow">第II部</div>
   <h2 style="font-size:clamp(26px,5vw,36px)">TASはどう使ったか</h2>
-  <p class="small muted">7〜8章。7,279F版の経路と、ほかのエンディングの入口。</p>
+  <p class="small muted">7〜8章。7,279F版の経路と、ほかのエンディングの入口。その後の7,262F版は前半を17フレーム詰めたもので、バグ発火後の8回の押下は7,279F版と同じ並びのまま、すべて17フレーム早くなっています（発火からのフレーム数で見れば同じ経路です）。</p>
 </section>
 
 <section>
@@ -534,12 +534,12 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
         <tr><td><code>40 6F</code></td><td class="mono">$03:800C</td><td>城と港の会話（エピローグ）。無入力のまま進み、エピローグのスクリプトの最後にある <code>40 70</code>（$1B:B1BE）を読んで、そこから先は <code>40 70</code> と同じになる。$1A:BB57 の経路では、7,289Fに <code>40 6F</code> を読み、710フレーム後の7,999Fにこの <code>40 70</code> を読む</td></tr>
       </tbody>
     </table></div>
-    <p class="small">ムービーの長さは最後の入力で決まるので、どちらの入口も同じ条件で比べられます。この並びがある場所に読む場所を合わせれば、エンディングが始まります。読む場所は直接指定できないので、「決まった下位バイトのボタン待ちに止まる」ことが本質的な条件です。止まれさえすれば、あとは待つフレーム数で合わせられます。</p>
+    <p class="small">ムービーの長さは最後の入力で決まるので、どちらの入口も同じ条件で比べられます。この並びがある場所に読む場所を合わせれば、エンディングが始まります。読む場所は直接指定できないので、「決まった下位バイトのボタン待ちに止まる」ことが本質的な条件です。止まったあとは、待つフレーム数で上位バイトを合わせます。ただし、その待ちに入った時点のタイマーから下がっていく途中に、狙う場所が来る場合に限ります（下の表の条件2）。</p>
     <div class="scroll"><table>
       <thead><tr><th>条件</th><th>内容</th><th>例：TASの $1B:B476（<code>40 70</code>）</th></tr></thead>
       <tbody>
         <tr><td>1. 下位バイト<br><span class="muted small">（これが難関）</span></td><td><code>40</code> の位置の下位バイトより1小さい位置にあるボタン待ちで止まる（押すと次の位置から読む）（場所によっては2小さい位置でもよい。下の表）</td><td>3回ジャンプして、下位バイトが75の <wbr>$1B:C275 のボタン待ちに止まる</td></tr>
-        <tr><td>2. 押すフレーム</td><td>読む場所の上位バイトが <code>40</code> の位置と同じになるフレームで押す。同じバンクで上位が大きければ、減るのを待つ。そうでなくても、待ち続ければバンクを行きつ戻りつするので、いずれ同じ場所を通る</td><td>C2からB4まで減るのを14フレーム待ってAを押す</td></tr>
+        <tr><td>2. 押すフレーム</td><td>読む場所の上位バイトが <code>40</code> の位置と同じになるフレームで押す。同じバンクで上位が大きければ、減るのを待つ。ただしタイマーは減る一方なので、届くのは「その待ちに入った時点のタイマーより下」の場所だけ。補正（4章）があるので1つの場所を通る機会は最大2回で、タイマーが0になって3,600に戻ったあとは、スクリプトのあるバンクにはもう届かない</td><td>C2からB4まで減るのを14フレーム待ってAを押す</td></tr>
       </tbody>
     </table></div>
     <h3>狙える場所と、止まればよいボタン待ちの候補</h3>
@@ -575,9 +575,9 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <thead><tr><th>入口</th><th>押し方（押したフレームとボタン）</th><th>押す回数</th><th>最後の入力（発火から）</th></tr></thead>
       <tbody>
       <tr><td><span class="mono">$1B:B476</span><br><span class="muted small">40 70・TAS</span></td><td class="mono small">7,215F A、7,218F A、7,221F A、7,227F A、7,235F A、7,244F X、7,255F X、7,278F A</td><td class="n">8</td><td class="n">83<br><span class="muted small">TASでは7,278F</span></td></tr>
-      <tr><td><span class="mono">$1A:BB57</span><br><span class="muted small">40 6F</span></td><td class="mono small">7,199F A、7,231F X、7,239F B、7,247F X、7,249F X、7,251F A、7,259F X、7,261F A、7,262F X、7,264F A、7,265F X、7,272F A、7,289F A</td><td class="n">13</td><td class="n">94<br><span class="muted small">TASでは7,289F</span></td></tr>
+      <tr><td><span class="mono">$1A:BB57</span><br><span class="muted small">40 6F</span></td><td class="mono small">7,231F X、7,239F B、7,247F X、7,249F X、7,251F A、7,259F X、7,261F A、7,262F X、7,264F A、7,265F X、7,272F A、7,289F A</td><td class="n">12</td><td class="n">94<br><span class="muted small">TASでは7,289F</span></td></tr>
       <tr><td><span class="mono">$1B:B280</span><br><span class="muted small">40 70</span></td><td class="mono small">7,203F A、7,212F A、7,233F A、7,249F A、7,254F A、7,256F A、7,258F X、7,261F A、7,262F B、7,264F A、7,265F X、7,275F A、7,321F A</td><td class="n">13</td><td class="n">126<br><span class="muted small">TASでは7,321F</span></td></tr>
-      <tr><td><span class="mono">$1B:AE33</span><br><span class="muted small">40 70</span></td><td class="mono small">7,199F A、7,231F X、7,239F B、7,247F X、7,249F X、7,251F A、7,259F X、7,261F A、7,262F X、7,264F A、7,269F A、7,271F A、7,272F X、7,328F A</td><td class="n">14</td><td class="n">133<br><span class="muted small">TASでは7,328F</span></td></tr>
+      <tr><td><span class="mono">$1B:AE33</span><br><span class="muted small">40 70</span></td><td class="mono small">7,231F X、7,239F B、7,247F X、7,249F X、7,251F A、7,259F X、7,261F A、7,262F X、7,264F A、7,269F A、7,271F A、7,272F X、7,328F A</td><td class="n">13</td><td class="n">133<br><span class="muted small">TASでは7,328F</span></td></tr>
       <tr><td><span class="mono">$1B:B0B3</span><br><span class="muted small">40 70</span></td><td class="mono small">7,209F A、7,217F A、7,226F A、7,328F A</td><td class="n">4</td><td class="n">133<br><span class="muted small">TASでは7,328F</span></td></tr>
       <tr><td><span class="mono">$1B:AE33</span><br><span class="muted small">40 70・押す回数が最少</span></td><td class="mono small">7,205F A、7,251F A、7,336F A</td><td class="n">3</td><td class="n">141<br><span class="muted small">TASでは7,336F</span></td></tr>
       <tr><td><span class="mono">$1B:B1BE</span><br><span class="muted small">40 70</span></td><td class="mono small">7,205F A、7,216F A、7,226F A、7,233F A、7,242F A、7,247F A、7,253F A、7,267F A、7,281F A、7,292F A、7,342F A、7,353F A</td><td class="n">12</td><td class="n">158<br><span class="muted small">TASでは7,353F</span></td></tr>
@@ -585,7 +585,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <tr><td><span class="mono">$1B:AF88</span><br><span class="muted small">40 70</span></td><td class="mono small">7,209F A、7,216F A、7,237F A、7,249F A、7,252F A、7,466F A</td><td class="n">6</td><td class="n">271<br><span class="muted small">TASでは7,466F</span></td></tr>
       </tbody>
     </table></div>
-    <figcaption>「最後の入力」は、発火（12枚目のメモが書き換わるフレーム、TASでは7,195F）を0として数えたフレームです。「TASでは」の値は、入力ファイルの行の番号（0始まり）です。<code>40 70</code> の経路は、どれも最後のAを押したフレーム、または数フレーム後にエンディングの処理（<span class="mono">$03:8D63</span>）へ入ることを、最初から通しで実行して確かめました。<code>40 6F</code> の経路（$1A:BB57）は、7,289Fに <code>40</code> を読んでエピローグから始まり、エンディングの処理に入るのは7,999Fです。$1A:BB57・$1B:B280・$1B:AE33の1つ目・$1A:E3F8・$1B:AF88 の経路は、別のチャットで行った探索（文字の表示中のXを含む）の結果を、こちらで最初から通しで実行して確かめたものです。X は、ボタン待ちではなく、文字を書いている途中で押すものです（TASの7,244F・7,255F など）。B はボタン待ちで押していて、A と同じくボタン待ちを抜けます。$1B:AE33 へ入る2つ目の経路は押下が3回で、見つかっている中で最も少ない操作です。$1B:B1BE の経路は、ランダムに押した試行でたまたま見つかったものを、必要な押下だけに絞りました。</figcaption>
+    <figcaption>「最後の入力」は、発火（12枚目のメモが書き換わるフレーム、TASでは7,195F）を0として数えたフレームです。「TASでは」の値は、入力ファイルの行の番号（0始まり）です。<code>40 70</code> の経路は、どれも最後のAを押したフレーム、または数フレーム後にエンディングの処理（<span class="mono">$03:8D63</span>）へ入ることを、最初から通しで実行して確かめました。<code>40 6F</code> の経路（$1A:BB57）は、7,289Fに <code>40</code> を読んでエピローグから始まり、エンディングの処理に入るのは7,999Fです。$1A:BB57・$1B:B280・$1B:AE33の1つ目・$1A:E3F8・$1B:AF88 の経路は、別のチャットで行った探索（文字の表示中のXを含む）の結果を、こちらで最初から通しで実行して確かめたものです。X は、ボタン待ちではなく、文字を書いている途中で押すものです（TASの7,244F・7,255F など）。B はボタン待ちで押していて、A と同じくボタン待ちを抜けます。$1A:BB57 と $1B:AE33 の1つ目の経路は、もとの探索結果では7,199FにもAを押していましたが、最初のボタン待ちが押下を受け付けるのは7,200Fからなので（5章）、このAは何も起こしません。外しても同じフレームにエンディングへ入ることを確かめたので、表からは外しています。$1B:AE33 へ入る2つ目の経路は押下が3回で、見つかっている中で最も少ない操作です。$1B:B1BE の経路は、ランダムに押した試行でたまたま見つかったものを、必要な押下だけに絞りました。</figcaption>
   </figure>
 </section>
 
@@ -755,7 +755,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   <p class="small muted">5章の出来事を、命令の並びとアドレスの計算まで確かめたい人向けの資料です。</p>
   <figure class="fig">
     <h3>スクリプト0x194の本来の中身（$1A:FF48〜FFAF、104バイト）</h3>
-    <p class="small">主人公ごとに違う曲番号を選んで鳴らすためのスクリプトです。同じ形のブロックが主人公の数だけ並んでいます。1ブロックは14バイトで、次の5つの命令でできています。</p>
+    <p class="small">主人公ごとに違う曲番号を選んで鳴らすためのスクリプトです。同じ形のブロックが主人公の数だけ並んでいます。1〜7番目のブロックは14バイトで、次の5つの命令でできています。8番目のブロックだけは条件判定と <code>00 FF</code> がなく6バイトなので、全体は 14×7＋6＝104バイトです。</p>
     <div class="bytes">
       <span class="by cmd"><i>47 17 01 vv</i><small>曲番号vvを$1701に書く</small></span>
       <span class="by cmd"><i>28 4n 0E</i><small>条件判定</small></span>
