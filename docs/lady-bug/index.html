@@ -631,7 +631,6 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
         <tr><td class="mono">$1D:CE4D</td><td><code>40 6F</code><br><span class="muted small">データの中の偶然の並び</span></td><td class="mono">4C</td><td class="n">2</td><td class="n">1</td><td class="n">1</td><td class="muted small">—</td></tr>
       </tbody>
     </table></div>
-    <figcaption>どの行も、実際の押し方でエンディングの最後の画面まで進むことを確かめました。</figcaption>
   </figure>
     <h3>表の見方</h3>
     <ul class="plain">
@@ -651,6 +650,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     <p>少し手前に入っても、間の命令を読み進んで <code>40</code> に届く場合があります。ただし、途中でフレームを使う命令があると、読む場所がまたずれます。</p>
     <p>$1D:CE4D や、その数バイト手前の $1D:CE47〜CE49 から入る道もあります。しかし、12枚目のメモのずれは番地を下げる向きにしか進まないので、バンク$1Dには $1C のスクリプトへジャンプしてからでないと届きません。実際の押し方は見つかっていません。</p>
     <h3>確かめた押し方</h3>
+    <p>「1つ手前から」と「2フレームずれて着地」の行は、次の押し方で、エンディングの最後の画面まで進むことを確かめました。$1D:CE4D の行は、上に書いたとおり、押し方が見つかっていません。</p>
     <div class="scroll"><table>
       <tr><th>入る場所</th><th>止まるボタン待ち</th><th>Aを押すフレーム</th></tr>
       <tr><td class="mono">$1B:B0B2</td><td class="mono">$1A:90B1</td><td>8章の $1B:B0B3 の経路</td></tr>
@@ -1181,7 +1181,7 @@ const Q=[
 ["ボタン待ちで止まっているあいだ、次に読む場所は毎フレーム256バイトずつ手前へ移る。",true,"タイマーは毎フレーム1ずつ減り、その下位バイトが読む場所の上位バイトになっているためです。区画の中での位置（下位バイト）は変わりません。"],
 ["ボタン待ちでは、AボタンとXボタンのどちらを押すかで、読む場所が変わる。",false,"ボタン待ちでは、どのボタンでも同じ場所を読みます。Xが効くのは別の場面で、ウィンドウが開く途中の決まったフレームにXを押していると、開く時間が6フレームから5フレームに縮みます。"],
 ["バグ中は、主人公の名前や所持品などRAMの内容を、命令として読ませることができる。",false,"読む場所は必ずROMの中に補正されます。上位バイトが0x80未満なら、次のバンクの上半分へ送られるためです。"],
-["エンディングを始める命令 40 70 は、ROMの中に1か所しかない。",false,"8か所あります。TASが使っているのはそのうちの $1B:B476 で、本物のエンディングスクリプト（0x277）の最後の2バイトです。"]
+["エンディングを始める命令 40 70 は、スクリプトのあるバンク（$1A〜$1C）の中に1か所しかない。",false,"8か所あります（ROM全体では、同じ2バイトの並びは52か所ありますが、スクリプトとして読めるのはこのバンクの中だけです）。TASが使っているのはそのうちの $1B:B476 で、本物のエンディングスクリプト（0x277）の最後の2バイトです。"]
 ];
 const ol=document.getElementById('quiz'), sc=document.getElementById('qScore'); let done=0, right=0;
 function build(){ ol.textContent=''; done=0; right=0; sc.textContent='0 / '+Q.length+' 問に回答';
